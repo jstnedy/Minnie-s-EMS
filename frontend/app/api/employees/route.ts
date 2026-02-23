@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { UserRole } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { auditLog } from "@/lib/audit";
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
           ],
         }
       : undefined,
-    orderBy: { createdAt: "desc" },
+    orderBy: { employeeId: "asc" },
   });
 
   return NextResponse.json(employees);
@@ -49,6 +49,7 @@ export async function POST(req: Request) {
 
   try {
     const parsed = employeeCreateSchema.parse(await req.json());
+    const normalizedEmployeeId = parsed.employeeId.trim().toUpperCase();
 
     if (!canAssignRole(guard.user.role, parsed.role)) {
       return NextResponse.json({ error: "Forbidden role assignment" }, { status: 403 });
@@ -71,8 +72,8 @@ export async function POST(req: Request) {
 
     const employee = await prisma.employee.create({
       data: {
-        employeeId: parsed.employeeId,
-        fullName: parsed.fullName,
+        employeeId: normalizedEmployeeId,
+        fullName: parsed.fullName.trim(),
         email: parsed.email || null,
         contactNumber: parsed.contactNumber || null,
         role: parsed.role,
@@ -84,16 +85,23 @@ export async function POST(req: Request) {
       },
     });
 
-    await auditLog({
-      actorId: guard.user.id,
-      action: "EMPLOYEE_CREATE",
-      entityType: "Employee",
-      entityId: employee.id,
-      metadata: { employeeId: employee.employeeId },
-    });
+    try {
+      await auditLog({
+        actorId: guard.user.id,
+        action: "EMPLOYEE_CREATE",
+        entityType: "Employee",
+        entityId: employee.id,
+        metadata: { employeeId: employee.employeeId },
+      });
+    } catch {
+      // Do not block employee creation if audit table is missing or not yet migrated.
+    }
 
     return NextResponse.json({ employee, tempPassword: parsed.email ? "Temp1234!" : null }, { status: 201 });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "Employee ID or email already exists" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }
 }

@@ -30,7 +30,10 @@ export function EmployeesClient() {
   async function load() {
     const res = await fetch(`/api/employees?q=${encodeURIComponent(q)}`);
     const data = await res.json();
-    setRows(data);
+    const sorted = Array.isArray(data)
+      ? [...data].sort((a, b) => String(a.employeeId).localeCompare(String(b.employeeId), undefined, { numeric: true }))
+      : [];
+    setRows(sorted);
   }
 
   useEffect(() => {
@@ -48,7 +51,11 @@ export function EmployeesClient() {
 
     setLoading(false);
     if (!res.ok) {
-      alert("Unable to create employee");
+      const errorBody = await res.json().catch(() => null);
+      const message = errorBody?.error
+        ? `${errorBody.error}${errorBody.detail ? `: ${errorBody.detail}` : ""}`
+        : "Unable to create employee";
+      alert(message);
       return;
     }
 
@@ -77,7 +84,7 @@ export function EmployeesClient() {
           <input className="field" placeholder="Hourly Rate" type="number" step="0.01" value={form.hourlyRate} onChange={(e) => setForm((v) => ({ ...v, hourlyRate: e.target.value }))} required />
           <input className="field" placeholder="Initial 6-digit passkey" pattern="\d{6}" value={form.passkey} onChange={(e) => setForm((v) => ({ ...v, passkey: e.target.value }))} required />
           <select className="field" value={form.role} onChange={(e) => setForm((v) => ({ ...v, role: e.target.value }))}>
-            <option value="EMPLOYEE">Employee</option>
+            <option value="EMPLOYEE">Staff</option>
             <option value="SUPERVISOR">Supervisor</option>
             <option value="ADMIN">Admin</option>
           </select>
