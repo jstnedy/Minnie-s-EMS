@@ -25,13 +25,13 @@ export async function GET(req: Request) {
     const items = await prisma.payrollItem.findMany({
       where: { payrollRunId: run.id },
       include: { employee: true },
-      orderBy: { employee: { fullName: "asc" } },
+      orderBy: { employee: { employeeId: "asc" } },
     });
 
     const header = ["Employee ID", "Name", "Shifts", "Hours", "Base Pay", "Adjustments", "Net Pay"];
     const rows = items.map((i) => [
       i.employee.employeeId,
-      i.employee.fullName,
+      `${i.employee.firstName} ${i.employee.lastName}`.trim(),
       String(i.totalShifts),
       String(i.totalHours),
       String(i.basePay),

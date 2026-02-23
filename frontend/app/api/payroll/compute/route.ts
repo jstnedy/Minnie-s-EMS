@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const items = await prisma.payrollItem.findMany({
       where: { payrollRunId: run.id },
       include: { employee: true },
-      orderBy: { employee: { fullName: "asc" } },
+      orderBy: { employee: { employeeId: "asc" } },
     });
 
     return NextResponse.json({ run, items });

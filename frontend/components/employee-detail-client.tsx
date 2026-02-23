@@ -14,8 +14,9 @@ type EmployeeDetailProps = {
   employee: {
     id: string;
     employeeId: string;
-    fullName: string;
-    role: string;
+    firstName: string;
+    lastName: string;
+    role: { id: string; name: string };
     status: string;
     hourlyRate: string | number;
     attendanceLogs: Log[];
@@ -48,10 +49,10 @@ export function EmployeeDetailClient({ employee, appBaseUrl }: EmployeeDetailPro
         <div className="card space-y-2">
           <h2 className="text-lg font-semibold">Profile</h2>
           <p className="text-sm">ID: {employee.employeeId}</p>
-          <p className="text-sm">Name: {employee.fullName}</p>
-          <p className="text-sm">Role: {employee.role}</p>
+          <p className="text-sm">Name: {`${employee.firstName} ${employee.lastName}`.trim()}</p>
+          <p className="text-sm">Role: {employee.role.name}</p>
           <p className="text-sm">Status: {employee.status}</p>
-          <p className="text-sm">Rate: ${Number(employee.hourlyRate).toFixed(2)} / hr</p>
+          <p className="text-sm">Rate: ₱{Number(employee.hourlyRate).toFixed(2)} / hr</p>
         </div>
         <div className="card space-y-3">
           <h2 className="text-lg font-semibold">QR Kiosk</h2>

@@ -1,58 +1,93 @@
-import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Prisma, UserRole } from "@prisma/client";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { auditLog } from "@/lib/audit";
-import { canAssignRole, requireApiRole } from "@/lib/rbac";
+import { requireApiRole } from "@/lib/rbac";
 import { employeeCreateSchema } from "@/lib/validators";
+
+function composeName(firstName: string, lastName: string) {
+  return `${firstName} ${lastName}`.trim();
+}
+
+async function generateEmployeeId() {
+  const year = new Date().getFullYear();
+  const prefix = `EMP-${year}-`;
+
+  const latest = await prisma.employee.findFirst({
+    where: { employeeId: { startsWith: prefix } },
+    orderBy: { employeeId: "desc" },
+    select: { employeeId: true },
+  });
+
+  const latestSeq = latest ? Number(latest.employeeId.slice(-6)) : 0;
+  const nextSeq = latestSeq + 1;
+  return `${prefix}${String(nextSeq).padStart(6, "0")}`;
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q") ?? "";
-  const employeeId = searchParams.get("employeeId") ?? "";
+  const q = searchParams.get("q")?.trim() ?? "";
+  const employeeId = searchParams.get("employeeId")?.trim() ?? "";
 
   if (employeeId) {
     const employee = await prisma.employee.findUnique({
       where: { employeeId },
-      select: { employeeId: true, fullName: true, status: true },
+      select: {
+        employeeId: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+      },
     });
 
     if (!employee) return NextResponse.json([]);
-    return NextResponse.json([employee]);
+    return NextResponse.json([
+      {
+        employeeId: employee.employeeId,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        fullName: composeName(employee.firstName, employee.lastName),
+        status: employee.status,
+      },
+    ]);
   }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !([UserRole.ADMIN, UserRole.SUPERVISOR] as UserRole[]).includes(session.user.role as UserRole)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.EMPLOYEE]);
+  if ("error" in guard) return guard.error;
 
   const employees = await prisma.employee.findMany({
     where: q
       ? {
           OR: [
             { employeeId: { contains: q, mode: "insensitive" } },
-            { fullName: { contains: q, mode: "insensitive" } },
+            { firstName: { contains: q, mode: "insensitive" } },
+            { lastName: { contains: q, mode: "insensitive" } },
           ],
         }
       : undefined,
+    include: { role: true },
     orderBy: { employeeId: "asc" },
   });
 
-  return NextResponse.json(employees);
+  return NextResponse.json(
+    employees.map((employee) => ({
+      ...employee,
+      fullName: composeName(employee.firstName, employee.lastName),
+    })),
+  );
 }
 
 export async function POST(req: Request) {
-  const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR]);
+  const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.EMPLOYEE]);
   if ("error" in guard) return guard.error;
 
   try {
     const parsed = employeeCreateSchema.parse(await req.json());
-    const normalizedEmployeeId = parsed.employeeId.trim().toUpperCase();
 
-    if (!canAssignRole(guard.user.role, parsed.role)) {
-      return NextResponse.json({ error: "Forbidden role assignment" }, { status: 403 });
+    const role = await prisma.role.findUnique({ where: { id: parsed.roleId } });
+    if (!role || !role.isActive) {
+      return NextResponse.json({ error: "Selected role is unavailable" }, { status: 400 });
     }
 
     const passkeyHash = await bcrypt.hash(parsed.passkey, 10);
@@ -64,26 +99,47 @@ export async function POST(req: Request) {
         data: {
           email: parsed.email,
           passwordHash,
-          role: parsed.role,
+          role: UserRole.EMPLOYEE,
         },
       });
       userId = user.id;
     }
 
-    const employee = await prisma.employee.create({
-      data: {
-        employeeId: normalizedEmployeeId,
-        fullName: parsed.fullName.trim(),
-        email: parsed.email || null,
-        contactNumber: parsed.contactNumber || null,
-        role: parsed.role,
-        passkeyHash,
-        hourlyRate: parsed.hourlyRate,
-        status: parsed.status,
-        userId,
-        mustChangePasskey: true,
-      },
-    });
+    let employee = null;
+    for (let i = 0; i < 5; i += 1) {
+      const generatedEmployeeId = await generateEmployeeId();
+      try {
+        employee = await prisma.employee.create({
+          data: {
+            employeeId: generatedEmployeeId,
+            firstName: parsed.firstName,
+            lastName: parsed.lastName,
+            email: parsed.email || null,
+            contactNumber: parsed.contactNumber || null,
+            roleId: parsed.roleId,
+            passkeyHash,
+            hourlyRate: parsed.hourlyRate,
+            status: parsed.status,
+            userId,
+            mustChangePasskey: true,
+          },
+          include: { role: true },
+        });
+        break;
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          const target = Array.isArray(error.meta?.target) ? error.meta?.target.join(",") : String(error.meta?.target ?? "");
+          if (target.includes("employee_id") || target.includes("employeeId")) {
+            continue;
+          }
+        }
+        throw error;
+      }
+    }
+
+    if (!employee) {
+      return NextResponse.json({ error: "Unable to generate unique employee ID" }, { status: 500 });
+    }
 
     try {
       await auditLog({
@@ -94,13 +150,23 @@ export async function POST(req: Request) {
         metadata: { employeeId: employee.employeeId },
       });
     } catch {
-      // Do not block employee creation if audit table is missing or not yet migrated.
+      // Do not block employee creation if audit table is missing.
     }
 
-    return NextResponse.json({ employee, tempPassword: parsed.email ? "Temp1234!" : null }, { status: 201 });
+    return NextResponse.json(
+      {
+        employee: {
+          ...employee,
+          fullName: composeName(employee.firstName, employee.lastName),
+        },
+        generatedEmployeeId: employee.employeeId,
+        tempPassword: parsed.email ? "Temp1234!" : null,
+      },
+      { status: 201 },
+    );
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ error: "Employee ID or email already exists" }, { status: 409 });
+      return NextResponse.json({ error: "Email already exists" }, { status: 409 });
     }
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }

@@ -5,7 +5,7 @@ type UserRole = "ADMIN" | "SUPERVISOR" | "EMPLOYEE";
 
 const accessMap: Record<string, UserRole[]> = {
   "/dashboard": ["ADMIN", "SUPERVISOR"],
-  "/employees": ["ADMIN", "SUPERVISOR"],
+  "/employees": ["ADMIN", "SUPERVISOR", "EMPLOYEE"],
   "/attendance": ["ADMIN", "SUPERVISOR"],
   "/payroll": ["ADMIN", "SUPERVISOR"],
   "/me": ["ADMIN", "SUPERVISOR", "EMPLOYEE"],

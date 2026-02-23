@@ -9,7 +9,7 @@ type PayrollItem = {
   basePay: string;
   adjustmentsTotal: string;
   netPay: string;
-  employee: { employeeId: string; fullName: string };
+  employee: { employeeId: string; firstName: string; lastName: string };
 };
 
 export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
@@ -79,7 +79,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-100">
-                <td className="py-2">{r.employee.employeeId} - {r.employee.fullName}</td>
+                <td className="py-2">{r.employee.employeeId} - {`${r.employee.firstName} ${r.employee.lastName}`.trim()}</td>
                 <td className="py-2">{r.totalShifts}</td>
                 <td className="py-2">{r.totalHours}</td>
                 <td className="py-2">${Number(r.basePay).toFixed(2)}</td>

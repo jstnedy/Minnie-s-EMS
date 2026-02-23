@@ -28,9 +28,9 @@ async function main() {
   });
 
   const employees = [
-    { employeeId: "EMP100", fullName: "Ava Baker", hourlyRate: "12.50", passkey: "111111" },
-    { employeeId: "EMP101", fullName: "Noah Frost", hourlyRate: "13.00", passkey: "222222" },
-    { employeeId: "EMP102", fullName: "Mia Dough", hourlyRate: "12.75", passkey: "333333" },
+    { employeeId: "EMP-2026-000100", firstName: "Ava", lastName: "Baker", hourlyRate: "12.50", passkey: "111111" },
+    { employeeId: "EMP-2026-000101", firstName: "Noah", lastName: "Frost", hourlyRate: "13.00", passkey: "222222" },
+    { employeeId: "EMP-2026-000102", firstName: "Mia", lastName: "Dough", hourlyRate: "12.75", passkey: "333333" },
   ];
 
   for (const e of employees) {
@@ -40,10 +40,11 @@ async function main() {
       update: {},
       create: {
         employeeId: e.employeeId,
-        fullName: e.fullName,
+        firstName: e.firstName,
+        lastName: e.lastName,
         hourlyRate: e.hourlyRate,
         passkeyHash,
-        role: UserRole.EMPLOYEE,
+        roleId: staffRole.id,
       },
     });
   }
@@ -53,10 +54,11 @@ async function main() {
     update: { userId: supervisor.id },
     create: {
       employeeId: "SUP200",
-      fullName: "Lead Supervisor",
+      firstName: "Lead",
+      lastName: "Supervisor",
       hourlyRate: "18.00",
       passkeyHash: await bcrypt.hash("444444", 10),
-      role: UserRole.SUPERVISOR,
+      roleId: supervisorRole.id,
       userId: supervisor.id,
     },
   });
@@ -66,10 +68,11 @@ async function main() {
     update: { userId: admin.id },
     create: {
       employeeId: "ADM900",
-      fullName: "System Admin",
+      firstName: "System",
+      lastName: "Admin",
       hourlyRate: "22.00",
       passkeyHash: await bcrypt.hash("555555", 10),
-      role: UserRole.ADMIN,
+      roleId: adminRole.id,
       userId: admin.id,
     },
   });
@@ -85,3 +88,20 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+  const [adminRole, supervisorRole, staffRole] = await Promise.all([
+    prisma.role.upsert({
+      where: { name: "Admin" },
+      update: { isActive: true },
+      create: { name: "Admin", isActive: true },
+    }),
+    prisma.role.upsert({
+      where: { name: "Supervisor" },
+      update: { isActive: true },
+      create: { name: "Supervisor", isActive: true },
+    }),
+    prisma.role.upsert({
+      where: { name: "Staff" },
+      update: { isActive: true },
+      create: { name: "Staff", isActive: true },
+    }),
+  ]);

@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auditLog } from "@/lib/audit";
-import { canAssignRole, requireApiRole } from "@/lib/rbac";
+import { requireApiRole } from "@/lib/rbac";
 import { employeeUpdateSchema } from "@/lib/validators";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
-  const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR]);
+  const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR, UserRole.EMPLOYEE]);
   if ("error" in guard) return guard.error;
 
   const { id } = await context.params;
 
   const employee = await prisma.employee.findUnique({
     where: { id },
-    include: { attendanceLogs: { orderBy: { timeIn: "desc" }, take: 50 } },
+    include: { role: true, attendanceLogs: { orderBy: { timeIn: "desc" }, take: 50 } },
   });
 
   if (!employee) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(employee);
+  return NextResponse.json({
+    ...employee,
+    fullName: `${employee.firstName} ${employee.lastName}`.trim(),
+  });
 }
 
 export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -29,21 +32,24 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   try {
     const parsed = employeeUpdateSchema.parse(await req.json());
 
-    if (parsed.role && !canAssignRole(guard.user.role, parsed.role)) {
-      return NextResponse.json({ error: "Forbidden role assignment" }, { status: 403 });
+    if (parsed.roleId) {
+      const role = await prisma.role.findUnique({ where: { id: parsed.roleId } });
+      if (!role) return NextResponse.json({ error: "Role not found" }, { status: 404 });
     }
 
     const employee = await prisma.employee.update({
       where: { id },
       data: {
-        ...parsed,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
         email: parsed.email === "" ? null : parsed.email,
+        contactNumber: parsed.contactNumber,
+        roleId: parsed.roleId,
+        hourlyRate: parsed.hourlyRate,
+        status: parsed.status,
       },
+      include: { role: true },
     });
-
-    if (employee.userId && parsed.role) {
-      await prisma.user.update({ where: { id: employee.userId }, data: { role: parsed.role } });
-    }
 
     await auditLog({
       actorId: guard.user.id,
@@ -53,8 +59,14 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       metadata: parsed,
     });
 
-    return NextResponse.json(employee);
+    return NextResponse.json({
+      ...employee,
+      fullName: `${employee.firstName} ${employee.lastName}`.trim(),
+    });
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ error: "Email already exists" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }
 }

@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 
 type Employee = {
   employeeId: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
 };
 
 export function KioskClient({ employeeId }: { employeeId: string }) {
@@ -18,7 +19,11 @@ export function KioskClient({ employeeId }: { employeeId: string }) {
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data) && data.length > 0) {
-          setEmployee({ employeeId: data[0].employeeId, fullName: data[0].fullName });
+          setEmployee({
+            employeeId: data[0].employeeId,
+            firstName: data[0].firstName,
+            lastName: data[0].lastName,
+          });
         }
       });
   }, [employeeId]);
@@ -43,7 +48,7 @@ export function KioskClient({ employeeId }: { employeeId: string }) {
   return (
     <div className="mx-auto mt-8 w-full max-w-sm space-y-4 rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
       <h1 className="text-center text-xl font-semibold text-orange-700">Attendance Kiosk</h1>
-      <p className="text-center text-sm text-slate-600">{employee ? employee.fullName : "Unknown employee"}</p>
+      <p className="text-center text-sm text-slate-600">{employee ? `${employee.firstName} ${employee.lastName}` : "Unknown employee"}</p>
       <input
         className="field text-center text-lg tracking-[0.3em]"
         maxLength={6}

@@ -9,7 +9,7 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const employee = await prisma.employee.findUnique({
     where: { id },
-    include: { attendanceLogs: { orderBy: { timeIn: "desc" }, take: 30 } },
+    include: { role: true, attendanceLogs: { orderBy: { timeIn: "desc" }, take: 30 } },
   });
 
   if (!employee) notFound();

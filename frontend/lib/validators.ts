@@ -5,18 +5,34 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+const moneySchema = z
+  .union([z.number(), z.string()])
+  .transform((v) => String(v).trim())
+  .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), "Hourly rate must have at most 2 decimals")
+  .transform((v) => Number(v))
+  .refine((v) => v >= 0, "Hourly rate must be at least 0");
+
 export const employeeCreateSchema = z.object({
-  employeeId: z.string().min(3),
-  fullName: z.string().min(2),
-  email: z.string().email().optional().or(z.literal("")),
-  contactNumber: z.string().optional(),
-  role: z.enum(["ADMIN", "SUPERVISOR", "EMPLOYEE"]),
-  hourlyRate: z.coerce.number().positive(),
+  firstName: z.string().trim().min(1, "First name is required"),
+  lastName: z.string().trim().min(1, "Last name is required"),
+  email: z.string().trim().email().optional().or(z.literal("")),
+  contactNumber: z.string().trim().optional(),
+  roleId: z.string().min(1, "Role is required"),
+  hourlyRate: moneySchema,
   passkey: z.string().regex(/^\d{6}$/),
   status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
 });
 
 export const employeeUpdateSchema = employeeCreateSchema.partial().omit({ passkey: true });
+
+export const roleCreateSchema = z.object({
+  name: z.string().trim().min(2, "Role name is required"),
+});
+
+export const roleUpdateSchema = z.object({
+  name: z.string().trim().min(2).optional(),
+  isActive: z.boolean().optional(),
+});
 
 export const passkeyResetSchema = z.object({
   tempPasskey: z.string().regex(/^\d{6}$/),
