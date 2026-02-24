@@ -55,7 +55,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
     const res = await fetch(`/api/payroll/compute?${query.toString()}`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || "Unable to compute");
+      alert(data?.error ? `${data.error}${data.detail ? `: ${data.detail}` : ""}` : "Unable to compute");
       return;
     }
     setRunId(data.run.id);

@@ -23,14 +23,48 @@ export async function GET(req: Request) {
 
     if (!run) return NextResponse.json({ error: "No payroll run for selected period" }, { status: 404 });
 
-    const items = await prisma.payrollItem.findMany({
+    const targetEmployee = employeeId
+      ? await prisma.employee.findUnique({ where: { employeeId }, select: { id: true } })
+      : null;
+
+    const itemsRaw = await prisma.payrollItem.findMany({
       where: {
         payrollRunId: run.id,
-        ...(employeeId ? { employee: { employeeId } } : {}),
+        ...(targetEmployee ? { employeeId: targetEmployee.id } : {}),
       },
-      include: { employee: true },
-      orderBy: { employee: { employeeId: "asc" } },
+      select: {
+        employeeId: true,
+        totalShifts: true,
+        totalHours: true,
+        basePay: true,
+        adjustmentsTotal: true,
+        netPay: true,
+      },
     });
+
+    const employeeIds = Array.from(new Set(itemsRaw.map((item) => item.employeeId)));
+    const employees = await prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: {
+        id: true,
+        employeeId: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+    const employeeByPk = new Map(employees.map((e) => [e.id, e]));
+
+    const items = itemsRaw
+      .map((item) => ({
+        ...item,
+        employee:
+          employeeByPk.get(item.employeeId) ?? {
+            employeeId: "DELETED",
+            firstName: "Deleted",
+            lastName: "Employee",
+          },
+      }))
+      .sort((a, b) => a.employee.employeeId.localeCompare(b.employee.employeeId, undefined, { numeric: true }));
 
     const header = ["Employee ID", "Name", "Shifts", "Hours", "Base Pay", "Adjustments", "Net Pay"];
     const rows = items.map((i) => [

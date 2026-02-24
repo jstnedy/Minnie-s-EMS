@@ -59,6 +59,14 @@ export function KioskClient({
   useEffect(() => {
     loadKioskStatus();
     ensureQrToken();
+
+    const timer = window.setInterval(() => {
+      loadKioskStatus();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
   }, [employeeId]);
 
   useEffect(() => {

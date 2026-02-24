@@ -59,14 +59,49 @@ export async function POST(req: Request) {
 
     await computePayrollRun(prisma, parsed.month, parsed.year, run.id, employeeId || undefined);
 
-    const items = await prisma.payrollItem.findMany({
+    const targetEmployee = employeeId
+      ? await prisma.employee.findUnique({ where: { employeeId }, select: { id: true } })
+      : null;
+
+    const itemsRaw = await prisma.payrollItem.findMany({
       where: {
         payrollRunId: run.id,
-        ...(employeeId ? { employee: { employeeId } } : {}),
+        ...(targetEmployee ? { employeeId: targetEmployee.id } : {}),
       },
-      include: { employee: true },
-      orderBy: { employee: { employeeId: "asc" } },
+      select: {
+        id: true,
+        employeeId: true,
+        totalShifts: true,
+        totalHours: true,
+        basePay: true,
+        adjustmentsTotal: true,
+        netPay: true,
+      },
     });
+
+    const employeeIds = Array.from(new Set(itemsRaw.map((item) => item.employeeId)));
+    const employees = await prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: {
+        id: true,
+        employeeId: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+    const employeeByPk = new Map(employees.map((e) => [e.id, e]));
+
+    const items = itemsRaw
+      .map((item) => ({
+        ...item,
+        employee:
+          employeeByPk.get(item.employeeId) ?? {
+            employeeId: "DELETED",
+            firstName: "Deleted",
+            lastName: "Employee",
+          },
+      }))
+      .sort((a, b) => a.employee.employeeId.localeCompare(b.employee.employeeId, undefined, { numeric: true }));
 
     return NextResponse.json({ run, items });
   } catch (error) {
