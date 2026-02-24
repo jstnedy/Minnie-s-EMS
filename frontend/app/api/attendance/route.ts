@@ -29,5 +29,22 @@ export async function GET(req: Request) {
     orderBy: { timeIn: "desc" },
   });
 
-  return NextResponse.json(logs);
+  return NextResponse.json(
+    logs.map((log) => ({
+      id: log.id,
+      employeeId: log.employeeId,
+      timeIn: log.timeIn,
+      timeOut: log.timeOut,
+      source: log.source,
+      deviceInfo: log.deviceInfo,
+      editedBy: log.editedBy,
+      editedAt: log.editedAt,
+      editReason: log.editReason,
+      createdAt: log.createdAt,
+      updatedAt: log.updatedAt,
+      hasTimeInPhoto: Boolean(log.timeInPhoto),
+      hasTimeOutPhoto: Boolean(log.timeOutPhoto),
+      employee: log.employee,
+    })),
+  );
 }
