@@ -11,7 +11,7 @@ export default async function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <div className="space-y-4 text-center">
-        <h1 className="text-2xl font-bold text-orange-700">Pastry Pal</h1>
+        <h1 className="text-2xl font-bold text-orange-700">Minnie&apos;s Cakes & Pastries</h1>
         <p className="text-sm text-slate-600">Employee Management + Attendance + Payroll</p>
         <LoginForm />
       </div>

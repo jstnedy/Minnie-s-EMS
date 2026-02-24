@@ -20,6 +20,12 @@ type EmployeeOption = {
 };
 
 export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
+  const phpFormatter = new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 2,
+  });
+
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -131,9 +137,9 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
                 <td className="py-2">{r.employee.employeeId} - {`${r.employee.firstName} ${r.employee.lastName}`.trim()}</td>
                 <td className="py-2">{r.totalShifts}</td>
                 <td className="py-2">{r.totalHours}</td>
-                <td className="py-2">${Number(r.basePay).toFixed(2)}</td>
-                <td className="py-2">${Number(r.adjustmentsTotal).toFixed(2)}</td>
-                <td className="py-2">${Number(r.netPay).toFixed(2)}</td>
+                <td className="py-2">{phpFormatter.format(Number(r.basePay))}</td>
+                <td className="py-2">{phpFormatter.format(Number(r.adjustmentsTotal))}</td>
+                <td className="py-2">{phpFormatter.format(Number(r.netPay))}</td>
               </tr>
             ))}
           </tbody>

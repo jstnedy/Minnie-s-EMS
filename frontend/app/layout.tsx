@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pastry Pal",
+  title: "Minnie's Cakes & Pastries",
   description: "Employee, attendance, and payroll management",
 };
 

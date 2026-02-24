@@ -16,7 +16,7 @@ export function AppNav({ role }: { role: UserRole }) {
   return (
     <div className="sticky top-0 z-10 border-b border-orange-100 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-        <div className="text-lg font-semibold text-orange-700">Pastry Pal</div>
+        <div className="text-lg font-semibold text-orange-700">Minnie&apos;s Cakes & Pastries</div>
         <nav className="flex items-center gap-3">
           {links.map((l) => (
             <Link key={l.href} href={l.href} className="text-sm text-slate-700 hover:text-orange-700">
