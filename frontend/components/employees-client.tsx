@@ -300,10 +300,10 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
                 </select>
               </div>
               <div>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">PHP</span>
+                <div className="mt-1 flex w-full overflow-hidden rounded-lg border border-slate-300 focus-within:border-orange-500">
+                  <span className="flex items-center bg-slate-50 px-3 text-sm text-slate-600">PHP</span>
                   <input
-                    className="field pl-12"
+                    className="w-full px-3 py-2 text-sm outline-none"
                     type="number"
                     step="0.01"
                     min={0}

@@ -17,9 +17,14 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
 
   async function load() {
     const query = employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : "";
-    const res = await fetch(`/api/attendance${query}`);
+    const res = await fetch(`/api/attendance${query}`, { cache: "no-store" });
     const data = await res.json();
-    setRows(data);
+    if (!res.ok) {
+      alert(data?.error || "Unable to load attendance records");
+      setRows([]);
+      return;
+    }
+    setRows(Array.isArray(data) ? data : []);
   }
 
   useEffect(() => {
