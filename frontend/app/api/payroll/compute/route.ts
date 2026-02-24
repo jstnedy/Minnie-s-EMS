@@ -11,6 +11,7 @@ export async function POST(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
+    const employeeId = searchParams.get("employeeId")?.trim() ?? "";
     const parsed = payrollComputeSchema.parse({
       month: searchParams.get("month"),
       year: searchParams.get("year"),
@@ -56,10 +57,13 @@ export async function POST(req: Request) {
       });
     }
 
-    await computePayrollRun(prisma, parsed.month, parsed.year, run.id);
+    await computePayrollRun(prisma, parsed.month, parsed.year, run.id, employeeId || undefined);
 
     const items = await prisma.payrollItem.findMany({
-      where: { payrollRunId: run.id },
+      where: {
+        payrollRunId: run.id,
+        ...(employeeId ? { employee: { employeeId } } : {}),
+      },
       include: { employee: true },
       orderBy: { employee: { employeeId: "asc" } },
     });

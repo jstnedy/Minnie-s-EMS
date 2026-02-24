@@ -1,11 +1,32 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import { monthRange } from "@/lib/utils";
 
-export async function computePayrollRun(prisma: PrismaClient, month: number, year: number, runId: string) {
+export async function computePayrollRun(
+  prisma: PrismaClient,
+  month: number,
+  year: number,
+  runId: string,
+  employeeCode?: string,
+) {
   const { start, end } = monthRange(year, month);
+  let employeePk: string | undefined;
+
+  if (employeeCode) {
+    const employee = await prisma.employee.findUnique({
+      where: { employeeId: employeeCode },
+      select: { id: true },
+    });
+    if (!employee) {
+      return;
+    }
+    employeePk = employee.id;
+  }
 
   const employees = await prisma.employee.findMany({
-    where: { status: "ACTIVE" },
+    where: {
+      status: "ACTIVE",
+      ...(employeePk ? { id: employeePk } : {}),
+    },
     include: {
       attendanceLogs: {
         where: {
@@ -53,7 +74,12 @@ export async function computePayrollRun(prisma: PrismaClient, month: number, yea
     });
   }
 
-  const adjustments = await prisma.payrollAdjustment.findMany({ where: { payrollRunId: runId } });
+  const adjustments = await prisma.payrollAdjustment.findMany({
+    where: {
+      payrollRunId: runId,
+      ...(employeePk ? { employeeId: employeePk } : {}),
+    },
+  });
 
   for (const adj of adjustments) {
     const item = await prisma.payrollItem.findUnique({

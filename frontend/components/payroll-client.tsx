@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type PayrollItem = {
   id: string;
@@ -12,15 +12,47 @@ type PayrollItem = {
   employee: { employeeId: string; firstName: string; lastName: string };
 };
 
+type EmployeeOption = {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  status?: string;
+};
+
 export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const [employeeId, setEmployeeId] = useState("");
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [runId, setRunId] = useState("");
   const [rows, setRows] = useState<PayrollItem[]>([]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEmployees() {
+      const res = await fetch("/api/employees");
+      if (!res.ok) return;
+      const data = (await res.json()) as EmployeeOption[];
+      if (cancelled) return;
+      setEmployees(data.filter((e) => e.status !== "INACTIVE"));
+    }
+
+    loadEmployees();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function compute() {
-    const res = await fetch(`/api/payroll/compute?month=${month}&year=${year}`, { method: "POST" });
+    const query = new URLSearchParams({
+      month: String(month),
+      year: String(year),
+      ...(employeeId ? { employeeId } : {}),
+    });
+
+    const res = await fetch(`/api/payroll/compute?${query.toString()}`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) {
       alert(data.error || "Unable to compute");
@@ -45,7 +77,13 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
   }
 
   function exportCsv() {
-    window.location.href = `/api/payroll/export?month=${month}&year=${year}`;
+    const query = new URLSearchParams({
+      month: String(month),
+      year: String(year),
+      ...(employeeId ? { employeeId } : {}),
+    });
+
+    window.location.href = `/api/payroll/export?${query.toString()}`;
   }
 
   return (
@@ -58,6 +96,17 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
         <div>
           <label className="text-sm">Year</label>
           <input className="field" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+        </div>
+        <div>
+          <label className="text-sm">Employee</label>
+          <select className="field" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+            <option value="">All employees</option>
+            {employees.map((employee) => (
+              <option key={employee.employeeId} value={employee.employeeId}>
+                {employee.employeeId} - {`${employee.firstName} ${employee.lastName}`.trim()}
+              </option>
+            ))}
+          </select>
         </div>
         <button className="btn-primary" onClick={compute}>Compute</button>
         <button className="btn-secondary" onClick={exportCsv}>Export CSV</button>

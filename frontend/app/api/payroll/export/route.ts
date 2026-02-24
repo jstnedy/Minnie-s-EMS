@@ -10,6 +10,7 @@ export async function GET(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
+    const employeeId = searchParams.get("employeeId")?.trim() ?? "";
     const parsed = payrollComputeSchema.parse({
       month: searchParams.get("month"),
       year: searchParams.get("year"),
@@ -23,7 +24,10 @@ export async function GET(req: Request) {
     if (!run) return NextResponse.json({ error: "No payroll run for selected period" }, { status: 404 });
 
     const items = await prisma.payrollItem.findMany({
-      where: { payrollRunId: run.id },
+      where: {
+        payrollRunId: run.id,
+        ...(employeeId ? { employee: { employeeId } } : {}),
+      },
       include: { employee: true },
       orderBy: { employee: { employeeId: "asc" } },
     });
@@ -44,7 +48,7 @@ export async function GET(req: Request) {
     return new NextResponse(csv, {
       headers: {
         "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename=payroll-${parsed.year}-${String(parsed.month).padStart(2, "0")}.csv`,
+        "Content-Disposition": `attachment; filename=payroll-${parsed.year}-${String(parsed.month).padStart(2, "0")}${employeeId ? `-${employeeId}` : ""}.csv`,
       },
     });
   } catch (error) {
