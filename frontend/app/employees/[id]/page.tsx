@@ -22,6 +22,8 @@ export default async function EmployeeDetailPage({ params }: { params: Promise<{
       timeIn: l.timeIn.toISOString(),
       timeOut: l.timeOut ? l.timeOut.toISOString() : null,
       source: l.source,
+      timeInPhoto: l.timeInPhoto,
+      timeOutPhoto: l.timeOutPhoto,
     })),
   };
 

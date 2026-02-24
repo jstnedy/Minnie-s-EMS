@@ -6,6 +6,8 @@ type AttendanceRow = {
   id: string;
   timeIn: string;
   timeOut: string | null;
+  timeInPhoto: string | null;
+  timeOutPhoto: string | null;
   employee: { employeeId: string; firstName: string; lastName: string };
 };
 
@@ -52,6 +54,8 @@ export function AttendanceClient() {
               <th className="py-2">Employee</th>
               <th className="py-2">Time In</th>
               <th className="py-2">Time Out</th>
+              <th className="py-2">In Photo</th>
+              <th className="py-2">Out Photo</th>
               <th className="py-2">Action</th>
             </tr>
           </thead>
@@ -65,6 +69,8 @@ export function AttendanceClient() {
                   <td className="py-2">{r.employee.employeeId} - {`${r.employee.firstName} ${r.employee.lastName}`.trim()}</td>
                   <td className="py-2">{new Date(r.timeIn).toLocaleString()}</td>
                   <td className="py-2">{r.timeOut ? new Date(r.timeOut).toLocaleString() : "Open"}</td>
+                  <td className="py-2">{r.timeInPhoto ? <img src={r.timeInPhoto} alt="Time in proof" className="h-10 w-14 rounded object-cover" /> : "-"}</td>
+                  <td className="py-2">{r.timeOutPhoto ? <img src={r.timeOutPhoto} alt="Time out proof" className="h-10 w-14 rounded object-cover" /> : "-"}</td>
                   <td className="py-2">
                     <button className="btn-secondary" onClick={() => saveEdit(r.id, new Date(timeIn).toISOString(), timeOut ? new Date(timeOut).toISOString() : null)}>
                       Quick Save

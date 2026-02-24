@@ -41,6 +41,9 @@ export const passkeyResetSchema = z.object({
 export const attendanceActionSchema = z.object({
   employeeId: z.string().min(1),
   passkey: z.string().regex(/^\d{6}$/),
+  qrSlot: z.coerce.number().int().nonnegative(),
+  qrSig: z.string().regex(/^[a-f0-9]{64}$/i),
+  photoDataUrl: z.string().startsWith("data:image/"),
 });
 
 export const attendanceEditSchema = z.object({

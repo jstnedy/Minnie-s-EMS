@@ -79,6 +79,8 @@ model AttendanceLog {
   employeeId String
   timeIn     DateTime
   timeOut    DateTime?
+  timeInPhoto  String?
+  timeOutPhoto String?
   source     String
   deviceInfo String?
   createdAt  DateTime @default(now())

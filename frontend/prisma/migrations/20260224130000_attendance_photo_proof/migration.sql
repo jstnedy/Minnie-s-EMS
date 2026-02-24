@@ -1,0 +1,2 @@
+ALTER TABLE "AttendanceLog" ADD COLUMN IF NOT EXISTS "timeInPhoto" TEXT;
+ALTER TABLE "AttendanceLog" ADD COLUMN IF NOT EXISTS "timeOutPhoto" TEXT;
