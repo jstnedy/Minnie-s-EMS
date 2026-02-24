@@ -23,7 +23,9 @@ export const employeeCreateSchema = z.object({
   status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
 });
 
-export const employeeUpdateSchema = employeeCreateSchema.partial().omit({ passkey: true });
+export const employeeUpdateSchema = employeeCreateSchema.partial().omit({ passkey: true }).extend({
+  employeeId: z.string().trim().min(1).optional(),
+});
 
 export const roleCreateSchema = z.object({
   name: z.string().trim().min(2, "Role name is required"),

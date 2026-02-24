@@ -12,12 +12,20 @@ type Log = {
   timeOutPhoto: string | null;
 };
 
+type RoleOption = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
 type EmployeeDetailProps = {
   employee: {
     id: string;
     employeeId: string;
     firstName: string;
     lastName: string;
+    email?: string | null;
+    contactNumber?: string | null;
     role: { id: string; name: string };
     status: string;
     hourlyRate: string | number;
@@ -28,8 +36,22 @@ type EmployeeDetailProps = {
 
 export function EmployeeDetailClient({ employee, appBaseUrl }: EmployeeDetailProps) {
   const [passkey, setPasskey] = useState("000000");
+  const [saving, setSaving] = useState(false);
+  const [roles, setRoles] = useState<RoleOption[]>([]);
+  const [form, setForm] = useState({
+    employeeId: employee.employeeId,
+    firstName: employee.firstName,
+    lastName: employee.lastName,
+    email: employee.email ?? "",
+    contactNumber: employee.contactNumber ?? "",
+    roleId: employee.role.id,
+    status: employee.status,
+    hourlyRate: String(employee.hourlyRate),
+  });
   const [qrValue, setQrValue] = useState(`${appBaseUrl}/kiosk?employeeId=${encodeURIComponent(employee.employeeId)}`);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
+
+  const currentEmployeeId = form.employeeId || employee.employeeId;
 
   async function resetPasskey() {
     const res = await fetch(`/api/employees/${employee.id}/reset-passkey`, {
@@ -45,11 +67,37 @@ export function EmployeeDetailClient({ employee, appBaseUrl }: EmployeeDetailPro
     alert("Passkey reset successful");
   }
 
+  async function saveProfile() {
+    setSaving(true);
+    const res = await fetch(`/api/employees/${employee.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        employeeId: form.employeeId.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        contactNumber: form.contactNumber.trim(),
+        roleId: form.roleId,
+        status: form.status,
+        hourlyRate: form.hourlyRate,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    setSaving(false);
+
+    if (!res.ok) {
+      alert(data?.error || "Unable to save profile");
+      return;
+    }
+    alert("Employee profile updated");
+  }
+
   useEffect(() => {
     let stopped = false;
 
     async function refreshQr() {
-      const res = await fetch(`/api/kiosk/qr?employeeId=${encodeURIComponent(employee.employeeId)}`);
+      const res = await fetch(`/api/kiosk/qr?employeeId=${encodeURIComponent(currentEmployeeId)}`);
       if (!res.ok) return;
       const data = await res.json();
       if (stopped) return;
@@ -57,25 +105,53 @@ export function EmployeeDetailClient({ employee, appBaseUrl }: EmployeeDetailPro
       setExpiresAt(data.expiresAt ?? null);
     }
 
+    async function loadRoles() {
+      const res = await fetch("/api/roles?includeInactive=true");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (stopped) return;
+      setRoles(Array.isArray(data.roles) ? data.roles : []);
+    }
+
     refreshQr();
+    loadRoles();
     const timer = window.setInterval(refreshQr, 60 * 1000);
 
     return () => {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [employee.employeeId]);
+  }, [currentEmployeeId]);
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="card space-y-2">
-          <h2 className="text-lg font-semibold">Profile</h2>
-          <p className="text-sm">ID: {employee.employeeId}</p>
-          <p className="text-sm">Name: {`${employee.firstName} ${employee.lastName}`.trim()}</p>
-          <p className="text-sm">Role: {employee.role.name}</p>
-          <p className="text-sm">Status: {employee.status}</p>
-          <p className="text-sm">Rate: PHP {Number(employee.hourlyRate).toFixed(2)} / hr</p>
+        <div className="card space-y-3">
+          <h2 className="text-lg font-semibold">Profile (Editable)</h2>
+          <div className="grid gap-2 md:grid-cols-2">
+            <input className="field" placeholder="Employee ID" value={form.employeeId} onChange={(e) => setForm((v) => ({ ...v, employeeId: e.target.value }))} />
+            <input className="field" placeholder="First name" value={form.firstName} onChange={(e) => setForm((v) => ({ ...v, firstName: e.target.value }))} />
+            <input className="field" placeholder="Last name" value={form.lastName} onChange={(e) => setForm((v) => ({ ...v, lastName: e.target.value }))} />
+            <input className="field" type="email" placeholder="Email" value={form.email} onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))} />
+            <input className="field" placeholder="Contact number" value={form.contactNumber} onChange={(e) => setForm((v) => ({ ...v, contactNumber: e.target.value }))} />
+            <input className="field" type="number" min={0} step="0.01" placeholder="Hourly rate" value={form.hourlyRate} onChange={(e) => setForm((v) => ({ ...v, hourlyRate: e.target.value }))} />
+            <select className="field" value={form.roleId} onChange={(e) => setForm((v) => ({ ...v, roleId: e.target.value }))}>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name} {role.isActive ? "" : "(Inactive)"}
+                </option>
+              ))}
+            </select>
+            <select className="field" value={form.status} onChange={(e) => setForm((v) => ({ ...v, status: e.target.value }))}>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
+            </select>
+          </div>
+          <div className="flex justify-end">
+            <button className="btn-primary" onClick={saveProfile} disabled={saving}>
+              {saving ? "Saving..." : "Save Profile"}
+            </button>
+          </div>
         </div>
         <div className="card space-y-3">
           <h2 className="text-lg font-semibold">QR Kiosk</h2>

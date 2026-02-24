@@ -40,6 +40,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     const employee = await prisma.employee.update({
       where: { id },
       data: {
+        employeeId: parsed.employeeId,
         firstName: parsed.firstName,
         lastName: parsed.lastName,
         email: parsed.email === "" ? null : parsed.email,
@@ -65,7 +66,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     });
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      return NextResponse.json({ error: "Email already exists" }, { status: 409 });
+      return NextResponse.json({ error: "Email or employee ID already exists" }, { status: 409 });
     }
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }
