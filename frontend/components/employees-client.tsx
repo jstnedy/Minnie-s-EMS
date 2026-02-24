@@ -32,7 +32,7 @@ type FormState = {
 };
 
 function formatPhp(value: string | number) {
-  return `?${Number(value).toFixed(2)}`;
+  return `PHP ${Number(value).toFixed(2)}`;
 }
 
 function validateForm(form: FormState) {
@@ -60,7 +60,7 @@ function validateForm(form: FormState) {
   return errors;
 }
 
-export function EmployeesClient() {
+export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
   const [rows, setRows] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [canManageRoles, setCanManageRoles] = useState(false);
@@ -213,6 +213,21 @@ export function EmployeesClient() {
     await loadRoles(true);
   }
 
+  async function deleteEmployee(id: string) {
+    const confirmed = window.confirm("Delete this employee record?");
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      alert(data?.error || "Unable to delete employee");
+      return;
+    }
+
+    await loadEmployees();
+  }
+
   const activeRoles = useMemo(() => roles.filter((r) => r.isActive), [roles]);
 
   return (
@@ -286,9 +301,9 @@ export function EmployeesClient() {
               </div>
               <div>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">?</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">PHP</span>
                   <input
-                    className="field pl-7"
+                    className="field pl-12"
                     type="number"
                     step="0.01"
                     min={0}
@@ -378,9 +393,16 @@ export function EmployeesClient() {
                     <td className="py-2">{formatPhp(employee.hourlyRate)}/hr</td>
                     <td className="py-2">{employee.status}</td>
                     <td className="py-2">
-                      <Link className="text-orange-700 underline" href={`/employees/${employee.id}`}>
-                        View
-                      </Link>
+                      <div className="flex gap-3">
+                        <Link className="text-orange-700 underline" href={`/employees/${employee.id}`}>
+                          View
+                        </Link>
+                        {canDelete ? (
+                          <button className="text-red-700 underline" onClick={() => deleteEmployee(employee.id)}>
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -75,7 +75,7 @@ export function EmployeeDetailClient({ employee, appBaseUrl }: EmployeeDetailPro
           <p className="text-sm">Name: {`${employee.firstName} ${employee.lastName}`.trim()}</p>
           <p className="text-sm">Role: {employee.role.name}</p>
           <p className="text-sm">Status: {employee.status}</p>
-          <p className="text-sm">Rate: ₱{Number(employee.hourlyRate).toFixed(2)} / hr</p>
+          <p className="text-sm">Rate: PHP {Number(employee.hourlyRate).toFixed(2)} / hr</p>
         </div>
         <div className="card space-y-3">
           <h2 className="text-lg font-semibold">QR Kiosk</h2>

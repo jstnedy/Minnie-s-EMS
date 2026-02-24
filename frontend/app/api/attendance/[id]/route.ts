@@ -38,3 +38,28 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }
 }
+
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const guard = await requireApiRole([UserRole.ADMIN]);
+  if ("error" in guard) return guard.error;
+
+  const { id } = await context.params;
+  const existing = await prisma.attendanceLog.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.attendanceLog.delete({ where: { id } });
+
+  await auditLog({
+    actorId: guard.user.id,
+    action: "ATTENDANCE_DELETE",
+    entityType: "AttendanceLog",
+    entityId: id,
+    metadata: {
+      employeeId: existing.employeeId,
+      timeIn: existing.timeIn.toISOString(),
+      timeOut: existing.timeOut ? existing.timeOut.toISOString() : null,
+    },
+  });
+
+  return NextResponse.json({ ok: true });
+}

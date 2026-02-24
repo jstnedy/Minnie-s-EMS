@@ -11,7 +11,7 @@ type AttendanceRow = {
   employee: { employeeId: string; firstName: string; lastName: string };
 };
 
-export function AttendanceClient() {
+export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [employeeId, setEmployeeId] = useState("");
 
@@ -37,6 +37,22 @@ export function AttendanceClient() {
       alert("Unable to save");
       return;
     }
+    await load();
+  }
+
+  async function deleteRecord(id: string) {
+    const confirmed = window.confirm("Delete this attendance record?");
+    if (!confirmed) return;
+
+    const res = await fetch(`/api/attendance/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      alert("Unable to delete record");
+      return;
+    }
+
     await load();
   }
 
@@ -72,9 +88,16 @@ export function AttendanceClient() {
                   <td className="py-2">{r.timeInPhoto ? <img src={r.timeInPhoto} alt="Time in proof" className="h-10 w-14 rounded object-cover" /> : "-"}</td>
                   <td className="py-2">{r.timeOutPhoto ? <img src={r.timeOutPhoto} alt="Time out proof" className="h-10 w-14 rounded object-cover" /> : "-"}</td>
                   <td className="py-2">
-                    <button className="btn-secondary" onClick={() => saveEdit(r.id, new Date(timeIn).toISOString(), timeOut ? new Date(timeOut).toISOString() : null)}>
-                      Quick Save
-                    </button>
+                    <div className="flex gap-2">
+                      <button className="btn-secondary" onClick={() => saveEdit(r.id, new Date(timeIn).toISOString(), timeOut ? new Date(timeOut).toISOString() : null)}>
+                        Quick Save
+                      </button>
+                      {canDelete ? (
+                        <button className="btn-secondary" onClick={() => deleteRecord(r.id)}>
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               );
