@@ -21,6 +21,7 @@ Production-ready Employee Management + Attendance + Payroll web app for a pastry
 
 ## Required Environment Variables
 - `DATABASE_URL`
+- `DIRECT_URL` (use direct DB host for Prisma Migrate; on Neon this should be the non-pooler connection string)
 - `NEXTAUTH_URL`
 - `NEXTAUTH_SECRET`
 - `APP_BASE_URL`
