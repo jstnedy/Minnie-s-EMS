@@ -17,14 +17,23 @@ export async function GET(req: Request) {
 
     const logs = await prisma.attendanceLog.findMany({
       where: {
-        employee: employeeId ? { employeeId } : undefined,
+        employeeId: employeeId
+          ? {
+              in: (
+                await prisma.employee.findMany({
+                  where: { employeeId },
+                  select: { id: true },
+                })
+              ).map((e) => e.id),
+            }
+          : undefined,
         timeIn:
           start || end
             ? {
                 gte: start ? new Date(start) : undefined,
                 lte: end ? new Date(end) : undefined,
-              }
-            : undefined,
+            }
+          : undefined,
       },
       orderBy: { timeIn: "desc" },
       select: {
@@ -41,15 +50,20 @@ export async function GET(req: Request) {
         updatedAt: true,
         timeInPhoto: true,
         timeOutPhoto: true,
-        employee: {
-          select: {
-            employeeId: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
       },
     });
+
+    const employeeIds = Array.from(new Set(logs.map((log) => log.employeeId)));
+    const employees = await prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: {
+        id: true,
+        employeeId: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+    const employeeById = new Map(employees.map((e) => [e.id, e]));
 
     return NextResponse.json(
       logs.map((log) => ({
@@ -66,7 +80,12 @@ export async function GET(req: Request) {
         updatedAt: log.updatedAt,
         hasTimeInPhoto: Boolean(log.timeInPhoto),
         hasTimeOutPhoto: Boolean(log.timeOutPhoto),
-        employee: log.employee,
+        employee:
+          employeeById.get(log.employeeId) ?? {
+            employeeId: "DELETED",
+            firstName: "Deleted",
+            lastName: "Employee",
+          },
       })),
       { headers: { "Cache-Control": "no-store" } },
     );
