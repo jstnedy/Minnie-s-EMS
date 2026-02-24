@@ -27,12 +27,19 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
   });
 
   const now = new Date();
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+  const [period, setPeriod] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [runId, setRunId] = useState("");
   const [rows, setRows] = useState<PayrollItem[]>([]);
+
+  function getMonthYear() {
+    const [yearText, monthText] = period.split("-");
+    return {
+      year: Number(yearText),
+      month: Number(monthText),
+    };
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +59,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
   }, []);
 
   async function compute() {
+    const { month, year } = getMonthYear();
     const query = new URLSearchParams({
       month: String(month),
       year: String(year),
@@ -83,6 +91,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
   }
 
   function exportCsv() {
+    const { month, year } = getMonthYear();
     const query = new URLSearchParams({
       month: String(month),
       year: String(year),
@@ -96,16 +105,29 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
     <div className="space-y-4">
       <div className="card flex flex-wrap items-end gap-3">
         <div>
-          <label className="text-sm">Month</label>
-          <input className="field" type="number" min={1} max={12} value={month} onChange={(e) => setMonth(Number(e.target.value))} />
-        </div>
-        <div>
-          <label className="text-sm">Year</label>
-          <input className="field" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+          <label className="text-sm">Payroll Period</label>
+          <input
+            className="field"
+            type="month"
+            value={period}
+            onChange={(e) => {
+              setPeriod(e.target.value);
+              setRunId("");
+              setRows([]);
+            }}
+          />
         </div>
         <div>
           <label className="text-sm">Employee</label>
-          <select className="field" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+          <select
+            className="field"
+            value={employeeId}
+            onChange={(e) => {
+              setEmployeeId(e.target.value);
+              setRunId("");
+              setRows([]);
+            }}
+          >
             <option value="">All employees</option>
             {employees.map((employee) => (
               <option key={employee.employeeId} value={employee.employeeId}>

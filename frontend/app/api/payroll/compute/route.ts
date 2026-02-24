@@ -22,10 +22,32 @@ export async function POST(req: Request) {
 
     const existingFinal = await prisma.payrollRun.findFirst({
       where: { month: parsed.month, year: parsed.year, status: "FINAL" },
+      orderBy: { createdAt: "desc" },
     });
 
     if (existingFinal) {
-      return NextResponse.json({ error: "Payroll already finalized for this period" }, { status: 409 });
+      const finalizedItemsCount = await prisma.payrollItem.count({
+        where: { payrollRunId: existingFinal.id },
+      });
+
+      // Recover from invalid empty FINAL runs caused by prior schema drift.
+      if (finalizedItemsCount === 0) {
+        await prisma.payrollAdjustment.deleteMany({
+          where: { payrollRunId: existingFinal.id },
+        });
+        await prisma.payrollRun.delete({
+          where: { id: existingFinal.id },
+        });
+      } else {
+        return NextResponse.json(
+          {
+            error: "Payroll already finalized for this period",
+            finalizedRunId: existingFinal.id,
+            finalizedAt: existingFinal.createdAt.toISOString(),
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const run = await prisma.payrollRun.upsert({
