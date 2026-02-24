@@ -95,6 +95,32 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
     alert("Payroll finalized");
   }
 
+  async function resetPeriod() {
+    const { month, year } = getMonthYear();
+    const confirmed = window.confirm(`Reset payroll for ${String(month).padStart(2, "0")}/${year}? This will delete DRAFT/FINAL runs for this period.`);
+    if (!confirmed) return;
+
+    const query = new URLSearchParams({
+      month: String(month),
+      year: String(year),
+    });
+
+    const res = await fetch(`/api/payroll/reset?${query.toString()}`, {
+      method: "POST",
+    });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      alert(data?.error ? `${data.error}${data.detail ? `: ${data.detail}` : ""}` : "Unable to reset payroll period");
+      return;
+    }
+
+    setRunId("");
+    setRunStatus("");
+    setRows([]);
+    alert("Payroll period reset successful");
+  }
+
   function exportCsv() {
     const { month, year } = getMonthYear();
     const query = new URLSearchParams({
@@ -146,6 +172,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
         <button className="btn-primary" onClick={compute}>Compute</button>
         <button className="btn-secondary" onClick={exportCsv}>Export CSV</button>
         {canFinalize ? <button className="btn-primary" onClick={finalizeRun} disabled={!runId || runStatus === "FINAL"}>Finalize</button> : null}
+        {canFinalize ? <button className="btn-secondary" onClick={resetPeriod}>Reset Payroll</button> : null}
       </div>
 
       <div className="card overflow-x-auto">
