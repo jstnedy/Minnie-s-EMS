@@ -5,6 +5,47 @@ import { attendanceEditSchema } from "@/lib/validators";
 import { auditLog } from "@/lib/audit";
 import { requireApiRole } from "@/lib/rbac";
 
+function decodeDataUrl(dataUrl: string) {
+  const m = dataUrl.match(/^data:(.+);base64,(.+)$/);
+  if (!m) return null;
+  const mimeType = m[1];
+  const base64 = m[2];
+  return { mimeType, bytes: Buffer.from(base64, "base64") };
+}
+
+export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
+  const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR]);
+  if ("error" in guard) return guard.error;
+
+  const { id } = await context.params;
+  const { searchParams } = new URL(req.url);
+  const photo = searchParams.get("photo");
+
+  if (photo !== "timeIn" && photo !== "timeOut") {
+    return NextResponse.json({ error: "photo query must be 'timeIn' or 'timeOut'" }, { status: 400 });
+  }
+
+  const log = await prisma.attendanceLog.findUnique({
+    where: { id },
+    select: { timeInPhoto: true, timeOutPhoto: true },
+  });
+
+  if (!log) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const raw = photo === "timeIn" ? log.timeInPhoto : log.timeOutPhoto;
+  if (!raw) return NextResponse.json({ error: "No photo" }, { status: 404 });
+
+  const decoded = decodeDataUrl(raw);
+  if (!decoded) return NextResponse.json({ error: "Invalid photo data" }, { status: 400 });
+
+  return new NextResponse(decoded.bytes, {
+    headers: {
+      "Content-Type": decoded.mimeType,
+      "Cache-Control": "private, max-age=300",
+    },
+  });
+}
+
 export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
   const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR]);
   if ("error" in guard) return guard.error;
