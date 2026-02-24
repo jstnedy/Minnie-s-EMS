@@ -20,6 +20,8 @@ export function KioskClient({
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [passkey, setPasskey] = useState("");
   const [status, setStatus] = useState("");
+  const [activeQrSlot, setActiveQrSlot] = useState(qrSlot);
+  const [activeQrSig, setActiveQrSig] = useState(qrSig);
   const [isTimedIn, setIsTimedIn] = useState(false);
   const [openShiftTimeIn, setOpenShiftTimeIn] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
@@ -38,8 +40,25 @@ export function KioskClient({
     setOpenShiftTimeIn(data.openShiftTimeIn ?? null);
   }
 
+  async function ensureQrToken() {
+    if (!employeeId) return;
+    if (activeQrSlot && activeQrSig) {
+      return { slot: activeQrSlot, sig: activeQrSig };
+    }
+
+    const res = await fetch(`/api/kiosk/qr?employeeId=${encodeURIComponent(employeeId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const slot = String(data.slot ?? "");
+    const sig = String(data.signature ?? "");
+    setActiveQrSlot(slot);
+    setActiveQrSig(sig);
+    return { slot, sig };
+  }
+
   useEffect(() => {
     loadKioskStatus();
+    ensureQrToken();
   }, [employeeId]);
 
   useEffect(() => {
@@ -98,7 +117,10 @@ export function KioskClient({
   }
 
   async function runAction(action: "time-in" | "time-out") {
-    if (!employeeId || !qrSlot || !qrSig) {
+    const token = await ensureQrToken();
+    const slot = token?.slot || activeQrSlot;
+    const sig = token?.sig || activeQrSig;
+    if (!employeeId || !slot || !sig) {
       setStatus("Invalid or expired QR code. Please rescan.");
       return;
     }
@@ -124,8 +146,8 @@ export function KioskClient({
       body: JSON.stringify({
         employeeId,
         passkey,
-        qrSlot: Number(qrSlot),
-        qrSig,
+        qrSlot: Number(slot),
+        qrSig: sig,
         photoDataUrl,
       }),
     });
@@ -139,6 +161,7 @@ export function KioskClient({
     setStatus(action === "time-in" ? "Time In recorded" : "Time Out recorded");
     setPasskey("");
     await loadKioskStatus();
+    await ensureQrToken();
   }
 
   return (
