@@ -4,6 +4,24 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  const [adminRole, supervisorRole, staffRole] = await Promise.all([
+    prisma.role.upsert({
+      where: { name: "Admin" },
+      update: { isActive: true },
+      create: { name: "Admin", isActive: true },
+    }),
+    prisma.role.upsert({
+      where: { name: "Supervisor" },
+      update: { isActive: true },
+      create: { name: "Supervisor", isActive: true },
+    }),
+    prisma.role.upsert({
+      where: { name: "Staff" },
+      update: { isActive: true },
+      create: { name: "Staff", isActive: true },
+    }),
+  ]);
+
   const adminPassword = await bcrypt.hash("Admin123!", 10);
   const supervisorPassword = await bcrypt.hash("Supervisor123!", 10);
 
@@ -88,20 +106,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-  const [adminRole, supervisorRole, staffRole] = await Promise.all([
-    prisma.role.upsert({
-      where: { name: "Admin" },
-      update: { isActive: true },
-      create: { name: "Admin", isActive: true },
-    }),
-    prisma.role.upsert({
-      where: { name: "Supervisor" },
-      update: { isActive: true },
-      create: { name: "Supervisor", isActive: true },
-    }),
-    prisma.role.upsert({
-      where: { name: "Staff" },
-      update: { isActive: true },
-      create: { name: "Staff", isActive: true },
-    }),
-  ]);
