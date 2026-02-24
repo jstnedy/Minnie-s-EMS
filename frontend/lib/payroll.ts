@@ -48,30 +48,38 @@ export async function computePayrollRun(
     const totalHours = Number((totalMs / (1000 * 60 * 60)).toFixed(2));
     const basePay = Number((totalHours * Number(employee.hourlyRate)).toFixed(2));
 
-    await prisma.payrollItem.upsert({
+    const existingItem = await prisma.payrollItem.findFirst({
       where: {
-        payrollRunId_employeeId: {
-          payrollRunId: runId,
-          employeeId: employee.id,
-        },
-      },
-      update: {
-        totalHours: new Prisma.Decimal(totalHours),
-        totalShifts: employee.attendanceLogs.length,
-        basePay: new Prisma.Decimal(basePay),
-        adjustmentsTotal: new Prisma.Decimal(0),
-        netPay: new Prisma.Decimal(basePay),
-      },
-      create: {
         payrollRunId: runId,
         employeeId: employee.id,
-        totalHours: new Prisma.Decimal(totalHours),
-        totalShifts: employee.attendanceLogs.length,
-        basePay: new Prisma.Decimal(basePay),
-        adjustmentsTotal: new Prisma.Decimal(0),
-        netPay: new Prisma.Decimal(basePay),
       },
+      select: { id: true },
     });
+
+    if (existingItem) {
+      await prisma.payrollItem.update({
+        where: { id: existingItem.id },
+        data: {
+          totalHours: new Prisma.Decimal(totalHours),
+          totalShifts: employee.attendanceLogs.length,
+          basePay: new Prisma.Decimal(basePay),
+          adjustmentsTotal: new Prisma.Decimal(0),
+          netPay: new Prisma.Decimal(basePay),
+        },
+      });
+    } else {
+      await prisma.payrollItem.create({
+        data: {
+          payrollRunId: runId,
+          employeeId: employee.id,
+          totalHours: new Prisma.Decimal(totalHours),
+          totalShifts: employee.attendanceLogs.length,
+          basePay: new Prisma.Decimal(basePay),
+          adjustmentsTotal: new Prisma.Decimal(0),
+          netPay: new Prisma.Decimal(basePay),
+        },
+      });
+    }
   }
 
   const adjustments = await prisma.payrollAdjustment.findMany({
@@ -82,12 +90,10 @@ export async function computePayrollRun(
   });
 
   for (const adj of adjustments) {
-    const item = await prisma.payrollItem.findUnique({
+    const item = await prisma.payrollItem.findFirst({
       where: {
-        payrollRunId_employeeId: {
-          payrollRunId: runId,
-          employeeId: adj.employeeId,
-        },
+        payrollRunId: runId,
+        employeeId: adj.employeeId,
       },
     });
 
