@@ -20,25 +20,26 @@ export function KioskClient({
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [passkey, setPasskey] = useState("");
   const [status, setStatus] = useState("");
+  const [isTimedIn, setIsTimedIn] = useState(false);
+  const [openShiftTimeIn, setOpenShiftTimeIn] = useState<string | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [photoPreview, setPhotoPreview] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  useEffect(() => {
+  async function loadKioskStatus() {
     if (!employeeId) return;
-    fetch(`/api/employees?employeeId=${encodeURIComponent(employeeId)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setEmployee({
-            employeeId: data[0].employeeId,
-            firstName: data[0].firstName,
-            lastName: data[0].lastName,
-          });
-        }
-      });
+    const res = await fetch(`/api/kiosk/status?employeeId=${encodeURIComponent(employeeId)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setEmployee(data.employee);
+    setIsTimedIn(Boolean(data.isTimedIn));
+    setOpenShiftTimeIn(data.openShiftTimeIn ?? null);
+  }
+
+  useEffect(() => {
+    loadKioskStatus();
   }, [employeeId]);
 
   useEffect(() => {
@@ -108,6 +109,15 @@ export function KioskClient({
       return;
     }
 
+    if (action === "time-in") {
+      const clientNow = new Date();
+      const confirmed = window.confirm(`Confirm Time In?\nTime in Time & Date: ${clientNow.toLocaleString()}`);
+      if (!confirmed) {
+        setStatus("Time in cancelled");
+        return;
+      }
+    }
+
     const res = await fetch(`/api/attendance/${action}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -128,12 +138,18 @@ export function KioskClient({
 
     setStatus(action === "time-in" ? "Time In recorded" : "Time Out recorded");
     setPasskey("");
+    await loadKioskStatus();
   }
 
   return (
     <div className="mx-auto mt-8 w-full max-w-sm space-y-4 rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
       <h1 className="text-center text-xl font-semibold text-orange-700">Attendance Kiosk</h1>
       <p className="text-center text-sm text-slate-600">{employee ? `${employee.firstName} ${employee.lastName}` : "Unknown employee"}</p>
+      <p className={`rounded-lg px-3 py-2 text-center text-sm font-medium ${isTimedIn ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-700"}`}>
+        {isTimedIn
+          ? `Currently timed in${openShiftTimeIn ? ` since ${new Date(openShiftTimeIn).toLocaleString()}` : ""}`
+          : "Currently timed out"}
+      </p>
       <div className="overflow-hidden rounded-xl border border-orange-100 bg-slate-900">
         <video ref={videoRef} className="h-52 w-full object-cover" playsInline muted />
       </div>
@@ -147,9 +163,12 @@ export function KioskClient({
         value={passkey}
         onChange={(e) => setPasskey(e.target.value)}
       />
-      <div className="grid grid-cols-2 gap-2">
-        <button className="btn-primary" onClick={() => runAction("time-in")} disabled={!cameraReady}>Time In</button>
-        <button className="btn-secondary" onClick={() => runAction("time-out")} disabled={!cameraReady}>Time Out</button>
+      <div className="grid grid-cols-1 gap-2">
+        {!isTimedIn ? (
+          <button className="btn-primary" onClick={() => runAction("time-in")} disabled={!cameraReady}>Time In</button>
+        ) : (
+          <button className="btn-secondary" onClick={() => runAction("time-out")} disabled={!cameraReady}>Time Out</button>
+        )}
       </div>
       <p className="text-center text-sm text-slate-700">{status}</p>
     </div>
