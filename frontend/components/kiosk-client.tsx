@@ -166,7 +166,8 @@ export function KioskClient({
       return;
     }
 
-    setStatus(action === "time-in" ? "Time In recorded" : "Time Out recorded");
+    const fullName = employee ? `${employee.firstName} ${employee.lastName}` : "Employee";
+    setStatus(action === "time-in" ? `Welcome, ${fullName}! Time In recorded.` : `Time Out recorded. Goodbye, ${fullName}.`);
     setPasskey("");
     await loadKioskStatus();
     await ensureQrToken();
@@ -176,6 +177,7 @@ export function KioskClient({
     <div className="mx-auto mt-8 w-full max-w-sm space-y-4 rounded-2xl border border-orange-100 bg-white p-5 shadow-sm">
       <h1 className="text-center text-xl font-semibold text-orange-700">Attendance Kiosk</h1>
       <p className="text-center text-sm text-slate-600">{employee ? `${employee.firstName} ${employee.lastName}` : "Unknown employee"}</p>
+      {employee ? <p className="text-center text-sm text-orange-700">Welcome, {employee.firstName}! Please enter your passkey.</p> : null}
       <p className={`rounded-lg px-3 py-2 text-center text-sm font-medium ${isTimedIn ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-700"}`}>
         {isTimedIn
           ? `Currently timed in${openShiftTimeIn ? ` since ${new Date(openShiftTimeIn).toLocaleString()}` : ""}`
