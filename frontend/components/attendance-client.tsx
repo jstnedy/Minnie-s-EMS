@@ -14,13 +14,16 @@ type AttendanceRow = {
 export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [employeeId, setEmployeeId] = useState("");
+  const [error, setError] = useState("");
 
   async function load() {
+    setError("");
     const query = employeeId ? `?employeeId=${encodeURIComponent(employeeId)}` : "";
     const res = await fetch(`/api/attendance${query}`, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok) {
-      alert(data?.error || "Unable to load attendance records");
+      const message = data?.error ? `${data.error}${data.detail ? `: ${data.detail}` : ""}` : "Unable to load attendance records";
+      setError(message);
       setRows([]);
       return;
     }
@@ -63,6 +66,7 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
 
   return (
     <div className="card space-y-3">
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
       <div className="flex items-center gap-2">
         <input className="field max-w-44" placeholder="Employee ID" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
         <button className="btn-secondary" onClick={load}>Filter</button>
