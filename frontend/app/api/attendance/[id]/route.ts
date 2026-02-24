@@ -47,7 +47,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
 }
 
 export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
-  const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR]);
+  const guard = await requireApiRole([UserRole.ADMIN]);
   if ("error" in guard) return guard.error;
 
   const { id } = await context.params;

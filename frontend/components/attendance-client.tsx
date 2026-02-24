@@ -15,6 +15,11 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, { timeIn: string; timeOut: string }>>({});
+
+  function toLocalInputValue(value: string) {
+    return new Date(value).toISOString().slice(0, 16);
+  }
 
   async function load() {
     setError("");
@@ -27,18 +32,40 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
       setRows([]);
       return;
     }
-    setRows(Array.isArray(data) ? data : []);
+    const safeRows = Array.isArray(data) ? data : [];
+    setRows(safeRows);
+    setDrafts(
+      Object.fromEntries(
+        safeRows.map((row) => [
+          row.id,
+          {
+            timeIn: toLocalInputValue(row.timeIn),
+            timeOut: row.timeOut ? toLocalInputValue(row.timeOut) : "",
+          },
+        ]),
+      ),
+    );
   }
 
   useEffect(() => {
     load();
   }, []);
 
-  async function saveEdit(id: string, timeIn: string, timeOut: string | null) {
+  async function saveEdit(id: string) {
+    const draft = drafts[id];
+    if (!draft?.timeIn) {
+      alert("Time In is required");
+      return;
+    }
+
     const res = await fetch(`/api/attendance/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timeIn, timeOut, editReason: "Manual correction" }),
+      body: JSON.stringify({
+        timeIn: new Date(draft.timeIn).toISOString(),
+        timeOut: draft.timeOut ? new Date(draft.timeOut).toISOString() : null,
+        editReason: "Manual correction",
+      }),
     });
 
     if (!res.ok) {
@@ -86,14 +113,47 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
           </thead>
           <tbody>
             {rows.map((r) => {
-              const timeIn = new Date(r.timeIn).toISOString().slice(0, 16);
-              const timeOut = r.timeOut ? new Date(r.timeOut).toISOString().slice(0, 16) : "";
+              const draft = drafts[r.id] ?? { timeIn: toLocalInputValue(r.timeIn), timeOut: r.timeOut ? toLocalInputValue(r.timeOut) : "" };
 
               return (
                 <tr key={r.id} className="border-b border-slate-100">
                   <td className="py-2">{r.employee.employeeId} - {`${r.employee.firstName} ${r.employee.lastName}`.trim()}</td>
-                  <td className="py-2">{new Date(r.timeIn).toLocaleString()}</td>
-                  <td className="py-2">{r.timeOut ? new Date(r.timeOut).toLocaleString() : "Open"}</td>
+                  <td className="py-2">
+                    {canDelete ? (
+                      <input
+                        className="field mt-0 min-w-48"
+                        type="datetime-local"
+                        value={draft.timeIn}
+                        onChange={(e) =>
+                          setDrafts((prev) => ({
+                            ...prev,
+                            [r.id]: { ...draft, timeIn: e.target.value },
+                          }))
+                        }
+                      />
+                    ) : (
+                      new Date(r.timeIn).toLocaleString()
+                    )}
+                  </td>
+                  <td className="py-2">
+                    {canDelete ? (
+                      <input
+                        className="field mt-0 min-w-48"
+                        type="datetime-local"
+                        value={draft.timeOut}
+                        onChange={(e) =>
+                          setDrafts((prev) => ({
+                            ...prev,
+                            [r.id]: { ...draft, timeOut: e.target.value },
+                          }))
+                        }
+                      />
+                    ) : r.timeOut ? (
+                      new Date(r.timeOut).toLocaleString()
+                    ) : (
+                      "Open"
+                    )}
+                  </td>
                   <td className="py-2">
                     {r.hasTimeInPhoto ? <img src={`/api/attendance/${r.id}?photo=timeIn`} alt="Time in proof" className="h-10 w-14 rounded object-cover" /> : "-"}
                   </td>
@@ -102,9 +162,11 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
                   </td>
                   <td className="py-2">
                     <div className="flex gap-2">
-                      <button className="btn-secondary" onClick={() => saveEdit(r.id, new Date(timeIn).toISOString(), timeOut ? new Date(timeOut).toISOString() : null)}>
-                        Quick Save
-                      </button>
+                      {canDelete ? (
+                        <button className="btn-secondary" onClick={() => saveEdit(r.id)}>
+                          Save
+                        </button>
+                      ) : null}
                       {canDelete ? (
                         <button className="btn-secondary" onClick={() => deleteRecord(r.id)}>
                           Delete
