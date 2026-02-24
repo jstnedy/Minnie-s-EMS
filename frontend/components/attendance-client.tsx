@@ -65,6 +65,9 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
       return;
     }
 
+    const confirmed = window.confirm("Save attendance changes for this record?");
+    if (!confirmed) return;
+
     const res = await fetch(`/api/attendance/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -80,6 +83,7 @@ export function AttendanceClient({ canDelete }: { canDelete: boolean }) {
       return;
     }
     await load();
+    alert("Attendance record saved");
   }
 
   async function deleteRecord(id: string) {

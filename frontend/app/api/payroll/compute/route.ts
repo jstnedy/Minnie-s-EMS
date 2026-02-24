@@ -34,6 +34,7 @@ async function getPayrollItems(runId: string, employeeCode: string) {
       employeeId: true,
       firstName: true,
       lastName: true,
+      hourlyRate: true,
     },
   });
   const employeeByPk = new Map(employees.map((e) => [e.id, e]));
@@ -46,6 +47,7 @@ async function getPayrollItems(runId: string, employeeCode: string) {
           employeeId: "DELETED",
           firstName: "Deleted",
           lastName: "Employee",
+          hourlyRate: 0,
         },
     }))
     .sort((a, b) => a.employee.employeeId.localeCompare(b.employee.employeeId, undefined, { numeric: true }));

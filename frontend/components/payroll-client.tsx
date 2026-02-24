@@ -9,7 +9,7 @@ type PayrollItem = {
   basePay: string;
   adjustmentsTotal: string;
   netPay: string;
-  employee: { employeeId: string; firstName: string; lastName: string };
+  employee: { employeeId: string; firstName: string; lastName: string; hourlyRate: string | number };
 };
 
 type EmployeeOption = {
@@ -180,6 +180,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
           <thead>
             <tr className="border-b border-slate-200 text-left">
               <th className="py-2">Employee</th>
+              <th className="py-2">Rate</th>
               <th className="py-2">Shifts</th>
               <th className="py-2">Hours</th>
               <th className="py-2">Base</th>
@@ -191,6 +192,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-100">
                 <td className="py-2">{r.employee.employeeId} - {`${r.employee.firstName} ${r.employee.lastName}`.trim()}</td>
+                <td className="py-2">{phpFormatter.format(Number(r.employee.hourlyRate))}/hr</td>
                 <td className="py-2">{r.totalShifts}</td>
                 <td className="py-2">{r.totalHours}</td>
                 <td className="py-2">{phpFormatter.format(Number(r.basePay))}</td>
