@@ -31,6 +31,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
   const [employeeId, setEmployeeId] = useState("");
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [runId, setRunId] = useState("");
+  const [runStatus, setRunStatus] = useState<"DRAFT" | "FINAL" | "">("");
   const [rows, setRows] = useState<PayrollItem[]>([]);
 
   function getMonthYear() {
@@ -73,7 +74,11 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
       return;
     }
     setRunId(data.run.id);
+    setRunStatus(data.run.status ?? "");
     setRows(data.items);
+    if (data.finalized && data.notice) {
+      alert(data.notice);
+    }
   }
 
   async function finalizeRun() {
@@ -113,6 +118,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
             onChange={(e) => {
               setPeriod(e.target.value);
               setRunId("");
+              setRunStatus("");
               setRows([]);
             }}
           />
@@ -125,6 +131,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
             onChange={(e) => {
               setEmployeeId(e.target.value);
               setRunId("");
+              setRunStatus("");
               setRows([]);
             }}
           >
@@ -138,7 +145,7 @@ export function PayrollClient({ canFinalize }: { canFinalize: boolean }) {
         </div>
         <button className="btn-primary" onClick={compute}>Compute</button>
         <button className="btn-secondary" onClick={exportCsv}>Export CSV</button>
-        {canFinalize ? <button className="btn-primary" onClick={finalizeRun} disabled={!runId}>Finalize</button> : null}
+        {canFinalize ? <button className="btn-primary" onClick={finalizeRun} disabled={!runId || runStatus === "FINAL"}>Finalize</button> : null}
       </div>
 
       <div className="card overflow-x-auto">

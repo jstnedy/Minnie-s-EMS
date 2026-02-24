@@ -5,6 +5,52 @@ import { requireApiRole } from "@/lib/rbac";
 import { payrollComputeBodySchema, payrollComputeSchema } from "@/lib/validators";
 import { computePayrollRun } from "@/lib/payroll";
 
+async function getPayrollItems(runId: string, employeeCode: string) {
+  const targetEmployee = employeeCode
+    ? await prisma.employee.findUnique({ where: { employeeId: employeeCode }, select: { id: true } })
+    : null;
+
+  const itemsRaw = await prisma.payrollItem.findMany({
+    where: {
+      payrollRunId: runId,
+      ...(targetEmployee ? { employeeId: targetEmployee.id } : {}),
+    },
+    select: {
+      id: true,
+      employeeId: true,
+      totalShifts: true,
+      totalHours: true,
+      basePay: true,
+      adjustmentsTotal: true,
+      netPay: true,
+    },
+  });
+
+  const employeeIds = Array.from(new Set(itemsRaw.map((item) => item.employeeId)));
+  const employees = await prisma.employee.findMany({
+    where: { id: { in: employeeIds } },
+    select: {
+      id: true,
+      employeeId: true,
+      firstName: true,
+      lastName: true,
+    },
+  });
+  const employeeByPk = new Map(employees.map((e) => [e.id, e]));
+
+  return itemsRaw
+    .map((item) => ({
+      ...item,
+      employee:
+        employeeByPk.get(item.employeeId) ?? {
+          employeeId: "DELETED",
+          firstName: "Deleted",
+          lastName: "Employee",
+        },
+    }))
+    .sort((a, b) => a.employee.employeeId.localeCompare(b.employee.employeeId, undefined, { numeric: true }));
+}
+
 export async function POST(req: Request) {
   const guard = await requireApiRole([UserRole.ADMIN, UserRole.SUPERVISOR]);
   if ("error" in guard) return guard.error;
@@ -39,14 +85,13 @@ export async function POST(req: Request) {
           where: { id: existingFinal.id },
         });
       } else {
-        return NextResponse.json(
-          {
-            error: "Payroll already finalized for this period",
-            finalizedRunId: existingFinal.id,
-            finalizedAt: existingFinal.createdAt.toISOString(),
-          },
-          { status: 409 },
-        );
+        const items = await getPayrollItems(existingFinal.id, employeeId);
+        return NextResponse.json({
+          run: existingFinal,
+          items,
+          finalized: true,
+          notice: "Payroll already finalized for this period",
+        });
       }
     }
 
@@ -81,49 +126,7 @@ export async function POST(req: Request) {
 
     await computePayrollRun(prisma, parsed.month, parsed.year, run.id, employeeId || undefined);
 
-    const targetEmployee = employeeId
-      ? await prisma.employee.findUnique({ where: { employeeId }, select: { id: true } })
-      : null;
-
-    const itemsRaw = await prisma.payrollItem.findMany({
-      where: {
-        payrollRunId: run.id,
-        ...(targetEmployee ? { employeeId: targetEmployee.id } : {}),
-      },
-      select: {
-        id: true,
-        employeeId: true,
-        totalShifts: true,
-        totalHours: true,
-        basePay: true,
-        adjustmentsTotal: true,
-        netPay: true,
-      },
-    });
-
-    const employeeIds = Array.from(new Set(itemsRaw.map((item) => item.employeeId)));
-    const employees = await prisma.employee.findMany({
-      where: { id: { in: employeeIds } },
-      select: {
-        id: true,
-        employeeId: true,
-        firstName: true,
-        lastName: true,
-      },
-    });
-    const employeeByPk = new Map(employees.map((e) => [e.id, e]));
-
-    const items = itemsRaw
-      .map((item) => ({
-        ...item,
-        employee:
-          employeeByPk.get(item.employeeId) ?? {
-            employeeId: "DELETED",
-            firstName: "Deleted",
-            lastName: "Employee",
-          },
-      }))
-      .sort((a, b) => a.employee.employeeId.localeCompare(b.employee.employeeId, undefined, { numeric: true }));
+    const items = await getPayrollItems(run.id, employeeId);
 
     return NextResponse.json({ run, items });
   } catch (error) {
