@@ -7,6 +7,9 @@ import { validateEmployeePasskey } from "@/lib/passkey";
 export async function POST(req: Request) {
   try {
     const parsed = attendanceActionSchema.parse(await req.json());
+    if (!parsed.photoDataUrl) {
+      return NextResponse.json({ error: "Time In photo is required" }, { status: 400 });
+    }
     if (!verifyKioskQr(parsed.employeeId, parsed.qrSlot, parsed.qrSig)) {
       return NextResponse.json({ error: "QR code expired or invalid" }, { status: 401 });
     }

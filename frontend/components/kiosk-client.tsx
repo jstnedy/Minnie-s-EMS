@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Employee = {
   employeeId: string;
@@ -17,6 +18,7 @@ export function KioskClient({
   qrSlot: string;
   qrSig: string;
 }) {
+  const router = useRouter();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [passkey, setPasskey] = useState("");
   const [status, setStatus] = useState("");
@@ -26,6 +28,10 @@ export function KioskClient({
   const [openShiftTimeIn, setOpenShiftTimeIn] = useState<string | null>(null);
   const [passkeyVerified, setPasskeyVerified] = useState(false);
   const [verifyingPasskey, setVerifyingPasskey] = useState(false);
+
+  function passkeyStorageKey(id: string) {
+    return `kiosk-passkey:${id}`;
+  }
 
   async function loadKioskStatus() {
     if (!employeeId) return;
@@ -101,11 +107,18 @@ export function KioskClient({
       return;
     }
 
+    if (!isTimedIn) {
+      sessionStorage.setItem(passkeyStorageKey(employeeId), passkey);
+      setStatus("Passkey verified. Redirecting to photo capture...");
+      router.push(`/attendance/kiosk/photo?employeeId=${encodeURIComponent(employeeId)}&slot=${encodeURIComponent(slot)}&sig=${encodeURIComponent(sig)}`);
+      return;
+    }
+
     setPasskeyVerified(true);
-    setStatus("Passkey verified. You can continue.");
+    setStatus("Passkey verified. You can continue to Time Out.");
   }
 
-  async function runAction(action: "time-in" | "time-out") {
+  async function runTimeOut() {
     if (!passkeyVerified) {
       setStatus("Verify passkey first.");
       return;
@@ -119,16 +132,7 @@ export function KioskClient({
       return;
     }
 
-    if (action === "time-in") {
-      const clientNow = new Date();
-      const confirmed = window.confirm(`Confirm Time In?\nTime in Time & Date: ${clientNow.toLocaleString()}`);
-      if (!confirmed) {
-        setStatus("Time in cancelled");
-        return;
-      }
-    }
-
-    const res = await fetch(`/api/attendance/${action}`, {
+    const res = await fetch("/api/attendance/time-out", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -147,7 +151,7 @@ export function KioskClient({
     }
 
     const fullName = employee ? `${employee.firstName} ${employee.lastName}` : "Employee";
-    setStatus(action === "time-in" ? `Welcome, ${fullName}! Time In recorded.` : `Time Out recorded. Goodbye, ${fullName}.`);
+    setStatus(`Time Out recorded. Goodbye, ${fullName}.`);
     setPasskey("");
     setPasskeyVerified(false);
     await loadKioskStatus();
@@ -181,9 +185,9 @@ export function KioskClient({
       </button>
       <div className="grid grid-cols-1 gap-2">
         {!isTimedIn ? (
-          <button className="btn-primary" onClick={() => runAction("time-in")} disabled={!passkeyVerified}>Time In</button>
+          <button className="btn-primary" onClick={verifyPasskey} disabled={verifyingPasskey || passkey.length !== 6}>Continue to Time In Photo</button>
         ) : (
-          <button className="btn-secondary" onClick={() => runAction("time-out")} disabled={!passkeyVerified}>Time Out</button>
+          <button className="btn-secondary" onClick={runTimeOut} disabled={!passkeyVerified}>Time Out</button>
         )}
       </div>
       <p className="text-center text-sm text-slate-700">{status}</p>
