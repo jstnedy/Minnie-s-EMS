@@ -7,10 +7,17 @@ export default async function DashboardPage() {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const [activeEmployees, todayAttendance, pendingCorrections] = await Promise.all([
+  let pendingCorrections = 0;
+  try {
+    pendingCorrections = await prisma.attendanceCorrectionRequest.count({ where: { status: "PENDING" } });
+  } catch {
+    // Fallback for environments where correction-request migration is not yet deployed.
+    pendingCorrections = 0;
+  }
+
+  const [activeEmployees, todayAttendance] = await Promise.all([
     prisma.employee.count({ where: { status: "ACTIVE" } }),
     prisma.attendanceLog.count({ where: { timeIn: { gte: todayStart } } }),
-    prisma.attendanceCorrectionRequest.count({ where: { status: "PENDING" } }),
   ]);
 
   const cards = [
