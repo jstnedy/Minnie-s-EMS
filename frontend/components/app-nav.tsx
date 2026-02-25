@@ -10,7 +10,6 @@ export function AppNav({ role }: { role: UserRole }) {
     { href: "/employees", label: "Employees", roles: ["ADMIN", "SUPERVISOR", "EMPLOYEE"] },
     { href: "/attendance", label: "Attendance", roles: ["ADMIN", "SUPERVISOR"] },
     { href: "/payroll", label: "Payroll", roles: ["ADMIN", "SUPERVISOR"] },
-    { href: "/me", label: "My Records", roles: ["ADMIN", "SUPERVISOR", "EMPLOYEE"] },
   ].filter((l) => l.roles.includes(role));
 
   return (

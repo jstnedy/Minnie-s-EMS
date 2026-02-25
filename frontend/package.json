@@ -7,6 +7,8 @@
     "build": "prisma generate --schema prisma/schema.prisma && next build",
     "start": "next start",
     "lint": "next lint",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
     "postinstall": "prisma generate --schema prisma/schema.prisma",
     "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
@@ -28,6 +30,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.1",
     "@types/react": "^19.0.2",
