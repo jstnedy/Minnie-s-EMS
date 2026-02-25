@@ -40,6 +40,7 @@ export function AttendanceClient({
   const [employeeId, setEmployeeId] = useState("");
   const [error, setError] = useState("");
   const [drafts, setDrafts] = useState<Record<string, { timeIn: string; timeOut: string }>>({});
+  const [highlightedCorrectionId, setHighlightedCorrectionId] = useState<string | null>(null);
 
   function toLocalInputValue(value: string) {
     const d = new Date(value);
@@ -90,6 +91,20 @@ export function AttendanceClient({
     load();
     loadCorrections();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const correctionId = params.get("correctionId");
+    if (!correctionId) return;
+    setHighlightedCorrectionId(correctionId);
+  }, []);
+
+  useEffect(() => {
+    if (!highlightedCorrectionId || corrections.length === 0) return;
+    const target = document.getElementById(`correction-${highlightedCorrectionId}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightedCorrectionId, corrections]);
 
   async function saveEdit(id: string) {
     const draft = drafts[id];
@@ -270,7 +285,13 @@ export function AttendanceClient({
           ) : (
             <div className="space-y-3">
               {corrections.map((row) => (
-                <div key={row.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+                <div
+                  id={`correction-${row.id}`}
+                  key={row.id}
+                  className={`rounded-lg border p-3 text-sm ${
+                    highlightedCorrectionId === row.id ? "border-orange-400 bg-orange-50" : "border-slate-200"
+                  }`}
+                >
                   <p className="font-medium">
                     {row.attendanceLog.employee.employeeId} - {`${row.attendanceLog.employee.firstName} ${row.attendanceLog.employee.lastName}`.trim()}
                   </p>

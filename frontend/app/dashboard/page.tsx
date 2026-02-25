@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { UserRole } from "@prisma/client";
 import { getServerSession } from "next-auth";
+import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -91,14 +92,18 @@ export default async function DashboardPage() {
           ) : (
             <div className="space-y-2 text-sm">
               {pendingSupervisorCorrections.map((row) => (
-                <div key={row.id} className="rounded border border-slate-200 p-2">
+                <Link
+                  key={row.id}
+                  href={`/attendance?correctionId=${encodeURIComponent(row.id)}`}
+                  className="block rounded border border-slate-200 p-2 hover:border-orange-300 hover:bg-orange-50/40"
+                >
                   <p className="font-medium">
                     {row.attendanceLog.employee.employeeId} - {`${row.attendanceLog.employee.firstName} ${row.attendanceLog.employee.lastName}`.trim()}
                   </p>
                   <p className="text-slate-600">Requested by: {row.requester.email}</p>
                   <p className="text-slate-600">Submitted: {new Date(row.createdAt).toLocaleString()}</p>
                   <p>Reason: {row.reason}</p>
-                </div>
+                </Link>
               ))}
             </div>
           )}
