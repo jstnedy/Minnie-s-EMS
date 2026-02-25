@@ -10,11 +10,13 @@ const accessMap: Record<string, UserRole[]> = {
   "/payroll": ["ADMIN", "SUPERVISOR"],
   "/me": ["ADMIN", "SUPERVISOR", "EMPLOYEE"],
 };
+const publicPrefixes = ["/kiosk", "/attendance/kiosk"];
 
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
+    if (publicPrefixes.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
     const protectedPath = Object.keys(accessMap).find((p) => pathname.startsWith(p));
     if (!protectedPath) return NextResponse.next();
@@ -35,6 +37,7 @@ export default withAuth(
     callbacks: {
       authorized: ({ token, req }) => {
         const pathname = req.nextUrl.pathname;
+        if (publicPrefixes.some((p) => pathname.startsWith(p))) return true;
         const needsAuth = Object.keys(accessMap).some((path) => pathname.startsWith(path));
         return needsAuth ? !!token : true;
       },
