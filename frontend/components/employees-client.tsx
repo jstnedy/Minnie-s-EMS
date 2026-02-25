@@ -39,10 +39,12 @@ function formatPhp(value: string | number) {
 function validateForm(form: FormState) {
   const errors: Partial<Record<keyof FormState, string>> = {};
   const weakPasskeys = new Set(["000000", "111111", "123456"]);
+  const contactNumberRegex = /^[0-9+\-\s()]{7,20}$/;
 
   if (!form.firstName.trim()) errors.firstName = "First name is required.";
   if (!form.lastName.trim()) errors.lastName = "Last name is required.";
   if (!form.contactNumber.trim()) errors.contactNumber = "Contact number is required.";
+  else if (!contactNumberRegex.test(form.contactNumber.trim())) errors.contactNumber = "Contact number must be 7-20 characters and contain valid phone symbols.";
 
   if (form.email.trim()) {
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -402,7 +404,7 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
                 />
                 {(submitAttempted || form.passkey) && formErrors.passkey ? <p className="mt-1 text-xs text-red-600">{formErrors.passkey}</p> : null}
               </div>
-              <div>
+              <div className="md:col-start-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">Confirm Passkey *</label>
                 <input
                   className="field"
@@ -417,7 +419,7 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
                 />
                 {(submitAttempted || form.confirmPasskey) && formErrors.confirmPasskey ? <p className="mt-1 text-xs text-red-600">{formErrors.confirmPasskey}</p> : null}
               </div>
-              <div className="flex items-end">
+              <div className="md:col-start-2">
                 <button className="btn-secondary" type="button" onClick={() => setShowPasskeys((v) => !v)}>
                   {showPasskeys ? "Hide PIN" : "Show PIN"}
                 </button>

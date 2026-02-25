@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const weakPasskeys = new Set(["000000", "111111", "123456"]);
+const contactNumberRegex = /^[0-9+\-\s()]{7,20}$/;
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -19,7 +20,11 @@ export const employeeCreateSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required"),
   lastName: z.string().trim().min(1, "Last name is required"),
   email: z.string().trim().email().optional().or(z.literal("")),
-  contactNumber: z.string().trim().min(1, "Contact number is required"),
+  contactNumber: z
+    .string()
+    .trim()
+    .min(1, "Contact number is required")
+    .refine((v) => contactNumberRegex.test(v), "Contact number must be 7-20 characters and contain valid phone symbols"),
   roleId: z.string().min(1, "Role is required"),
   hourlyRate: moneySchema,
   passkey: z
