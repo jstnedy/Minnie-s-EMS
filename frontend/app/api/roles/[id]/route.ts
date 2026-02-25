@@ -40,3 +40,24 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }
 }
+
+export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
+  const guard = await requireApiRole([UserRole.ADMIN]);
+  if ("error" in guard) return guard.error;
+
+  try {
+    const { id } = await context.params;
+    await prisma.role.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        return NextResponse.json({ error: "Role not found" }, { status: 404 });
+      }
+      if (error.code === "P2003") {
+        return NextResponse.json({ error: "Cannot delete role while it is assigned to employees" }, { status: 409 });
+      }
+    }
+    return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
+  }
+}

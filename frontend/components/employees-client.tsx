@@ -28,6 +28,7 @@ type FormState = {
   roleId: string;
   hourlyRate: string;
   passkey: string;
+  confirmPasskey: string;
   status: "ACTIVE" | "INACTIVE";
 };
 
@@ -37,25 +38,39 @@ function formatPhp(value: string | number) {
 
 function validateForm(form: FormState) {
   const errors: Partial<Record<keyof FormState, string>> = {};
+  const weakPasskeys = new Set(["000000", "111111", "123456"]);
 
   if (!form.firstName.trim()) errors.firstName = "First name is required.";
   if (!form.lastName.trim()) errors.lastName = "Last name is required.";
+  if (!form.contactNumber.trim()) errors.contactNumber = "Contact number is required.";
 
   if (form.email.trim()) {
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRe.test(form.email.trim())) errors.email = "Invalid email format.";
   }
 
-  if (!form.roleId) errors.roleId = "Role is required.";
+  if (!form.roleId) errors.roleId = "Position is required.";
 
   const rate = form.hourlyRate.trim();
   if (!/^\d+(\.\d{1,2})?$/.test(rate)) {
     errors.hourlyRate = "Use a valid amount with up to 2 decimals.";
-  } else if (Number(rate) < 0) {
-    errors.hourlyRate = "Hourly rate must be at least 0.";
+  } else if (Number(rate) <= 0) {
+    errors.hourlyRate = "Hourly rate must be greater than 0.";
+  } else if (Number(rate) > 100000) {
+    errors.hourlyRate = "Hourly rate exceeds allowed maximum.";
   }
 
-  if (!/^\d{6}$/.test(form.passkey)) errors.passkey = "Passkey must be 6 digits.";
+  if (!/^\d{6}$/.test(form.passkey)) {
+    errors.passkey = "Passkey must be exactly 6 digits.";
+  } else if (weakPasskeys.has(form.passkey)) {
+    errors.passkey = "Passkey is too common.";
+  }
+
+  if (!form.confirmPasskey) {
+    errors.confirmPasskey = "Confirm passkey is required.";
+  } else if (form.confirmPasskey !== form.passkey) {
+    errors.confirmPasskey = "Passkeys do not match.";
+  }
 
   return errors;
 }
@@ -68,7 +83,8 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
   const [roleBusyId, setRoleBusyId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [formErrors, setFormErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [showPasskeys, setShowPasskeys] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [form, setForm] = useState<FormState>({
     firstName: "",
     lastName: "",
@@ -76,9 +92,12 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
     contactNumber: "",
     roleId: "",
     hourlyRate: "12.00",
-    passkey: "000000",
+    passkey: "",
+    confirmPasskey: "",
     status: "ACTIVE",
   });
+  const formErrors = useMemo(() => validateForm(form), [form]);
+  const canSubmit = Object.keys(formErrors).length === 0;
 
   const hasRows = rows.length > 0;
 
@@ -125,10 +144,9 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
 
   async function createEmployee(e: React.FormEvent) {
     e.preventDefault();
+    setSubmitAttempted(true);
 
-    const errors = validateForm(form);
-    setFormErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (!canSubmit) return;
 
     setSubmitting(true);
     const payload = {
@@ -166,12 +184,28 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
       contactNumber: "",
       roleId: roles.find((r) => r.isActive)?.id || "",
       hourlyRate: "12.00",
-      passkey: "000000",
+      passkey: "",
+      confirmPasskey: "",
       status: "ACTIVE",
     });
-    setFormErrors({});
+    setSubmitAttempted(false);
 
     await loadEmployees();
+  }
+
+  function cancelCreateForm() {
+    setForm({
+      firstName: "",
+      lastName: "",
+      email: "",
+      contactNumber: "",
+      roleId: roles.find((r) => r.isActive)?.id || "",
+      hourlyRate: "12.00",
+      passkey: "",
+      confirmPasskey: "",
+      status: "ACTIVE",
+    });
+    setSubmitAttempted(false);
   }
 
   async function createRole(e: React.FormEvent) {
@@ -213,6 +247,27 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
     await loadRoles(true);
   }
 
+  async function deleteRole(role: Role) {
+    if (!canDelete) return;
+    const confirmed = window.confirm(`Delete role "${role.name}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setRoleBusyId(role.id);
+    const res = await fetch(`/api/roles/${role.id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => null);
+    setRoleBusyId(null);
+
+    if (!res.ok) {
+      alert(data?.error || "Unable to delete role");
+      return;
+    }
+
+    await loadRoles(true);
+    if (form.roleId === role.id) {
+      setForm((prev) => ({ ...prev, roleId: roles.find((r) => r.isActive && r.id !== role.id)?.id || "" }));
+    }
+  }
+
   async function deleteEmployee(id: string) {
     const confirmed = window.confirm("Delete this employee record?");
     if (!confirmed) return;
@@ -240,6 +295,7 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Identity</h3>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">First Name *</label>
                 <input
                   className="field"
                   placeholder="First Name"
@@ -247,9 +303,10 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
                   onChange={(e) => setForm((v) => ({ ...v, firstName: e.target.value }))}
                   required
                 />
-                {formErrors.firstName ? <p className="mt-1 text-xs text-red-600">{formErrors.firstName}</p> : null}
+                {(submitAttempted || form.firstName) && formErrors.firstName ? <p className="mt-1 text-xs text-red-600">{formErrors.firstName}</p> : null}
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Last Name *</label>
                 <input
                   className="field"
                   placeholder="Last Name"
@@ -257,9 +314,10 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
                   onChange={(e) => setForm((v) => ({ ...v, lastName: e.target.value }))}
                   required
                 />
-                {formErrors.lastName ? <p className="mt-1 text-xs text-red-600">{formErrors.lastName}</p> : null}
+                {(submitAttempted || form.lastName) && formErrors.lastName ? <p className="mt-1 text-xs text-red-600">{formErrors.lastName}</p> : null}
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Email (optional)</label>
                 <input
                   className="field"
                   type="email"
@@ -267,16 +325,19 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
                   value={form.email}
                   onChange={(e) => setForm((v) => ({ ...v, email: e.target.value }))}
                 />
-                {formErrors.email ? <p className="mt-1 text-xs text-red-600">{formErrors.email}</p> : null}
+                {(submitAttempted || form.email) && formErrors.email ? <p className="mt-1 text-xs text-red-600">{formErrors.email}</p> : null}
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Contact Number *</label>
                 <input
                   className="field"
                   type="tel"
                   placeholder="Contact Number"
                   value={form.contactNumber}
                   onChange={(e) => setForm((v) => ({ ...v, contactNumber: e.target.value }))}
+                  required
                 />
+                {(submitAttempted || form.contactNumber) && formErrors.contactNumber ? <p className="mt-1 text-xs text-red-600">{formErrors.contactNumber}</p> : null}
               </div>
             </div>
           </div>
@@ -285,52 +346,90 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
             <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Employment</h3>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Position *</label>
                 <select className="field" value={form.roleId} onChange={(e) => setForm((v) => ({ ...v, roleId: e.target.value }))}>
                   <option value="">Select role</option>
                   {activeRoles.map((role) => (
                     <option key={role.id} value={role.id}>{role.name}</option>
                   ))}
                 </select>
-                {formErrors.roleId ? <p className="mt-1 text-xs text-red-600">{formErrors.roleId}</p> : null}
+                {submitAttempted && formErrors.roleId ? <p className="mt-1 text-xs text-red-600">{formErrors.roleId}</p> : null}
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Status *</label>
                 <select className="field" value={form.status} onChange={(e) => setForm((v) => ({ ...v, status: e.target.value as FormState["status"] }))}>
                   <option value="ACTIVE">Active</option>
                   <option value="INACTIVE">Inactive</option>
                 </select>
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Hourly Rate (PHP) *</label>
                 <div className="mt-1 flex w-full overflow-hidden rounded-lg border border-slate-300 focus-within:border-orange-500">
                   <span className="flex items-center bg-slate-50 px-3 text-sm text-slate-600">PHP</span>
                   <input
-                    className="w-full px-3 py-2 text-sm outline-none"
+                    className="w-full px-3 py-2 text-right text-sm outline-none"
                     type="number"
                     step="0.01"
                     min={0}
+                    max={100000}
                     placeholder="12.00"
                     value={form.hourlyRate}
                     onChange={(e) => setForm((v) => ({ ...v, hourlyRate: e.target.value }))}
+                    onBlur={(e) => {
+                      if (!e.target.value.trim()) return;
+                      const value = Number(e.target.value);
+                      if (!Number.isNaN(value)) {
+                        setForm((v) => ({ ...v, hourlyRate: value.toFixed(2) }));
+                      }
+                    }}
                     required
                   />
                 </div>
-                {formErrors.hourlyRate ? <p className="mt-1 text-xs text-red-600">{formErrors.hourlyRate}</p> : null}
+                {(submitAttempted || form.hourlyRate) && formErrors.hourlyRate ? <p className="mt-1 text-xs text-red-600">{formErrors.hourlyRate}</p> : null}
               </div>
               <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Employee Passkey (6-digit PIN) *</label>
                 <input
                   className="field"
-                  placeholder="Initial 6-digit passkey"
+                  type={showPasskeys ? "text" : "password"}
+                  inputMode="numeric"
                   pattern="\d{6}"
+                  maxLength={6}
+                  placeholder="Enter 6-digit PIN"
                   value={form.passkey}
-                  onChange={(e) => setForm((v) => ({ ...v, passkey: e.target.value }))}
+                  onChange={(e) => setForm((v) => ({ ...v, passkey: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
                   required
                 />
-                {formErrors.passkey ? <p className="mt-1 text-xs text-red-600">{formErrors.passkey}</p> : null}
+                {(submitAttempted || form.passkey) && formErrors.passkey ? <p className="mt-1 text-xs text-red-600">{formErrors.passkey}</p> : null}
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Confirm Passkey *</label>
+                <input
+                  className="field"
+                  type={showPasskeys ? "text" : "password"}
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  placeholder="Re-enter 6-digit PIN"
+                  value={form.confirmPasskey}
+                  onChange={(e) => setForm((v) => ({ ...v, confirmPasskey: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                  required
+                />
+                {(submitAttempted || form.confirmPasskey) && formErrors.confirmPasskey ? <p className="mt-1 text-xs text-red-600">{formErrors.confirmPasskey}</p> : null}
+              </div>
+              <div className="flex items-end">
+                <button className="btn-secondary" type="button" onClick={() => setShowPasskeys((v) => !v)}>
+                  {showPasskeys ? "Hide PIN" : "Show PIN"}
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <button className="btn-primary min-w-32" disabled={submitting}>
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary min-w-24" type="button" onClick={cancelCreateForm} disabled={submitting}>
+              Cancel
+            </button>
+            <button className="btn-primary min-w-32" disabled={submitting || !canSubmit}>
               {submitting ? "Creating..." : "Create"}
             </button>
           </div>
@@ -349,9 +448,16 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
               <div key={role.id} className="rounded-lg border border-slate-200 p-3">
                 <p className="font-medium">{role.name}</p>
                 <p className="text-xs text-slate-600">{role.isActive ? "Active" : "Inactive"}</p>
-                <button className="btn-secondary mt-2" disabled={roleBusyId === role.id} onClick={() => toggleRoleActive(role)}>
-                  {roleBusyId === role.id ? "Saving..." : role.isActive ? "Deactivate" : "Activate"}
-                </button>
+                <div className="mt-2 flex gap-2">
+                  <button className="btn-secondary" disabled={roleBusyId === role.id} onClick={() => toggleRoleActive(role)}>
+                    {roleBusyId === role.id ? "Saving..." : role.isActive ? "Deactivate" : "Activate"}
+                  </button>
+                  {canDelete ? (
+                    <button className="btn-secondary" disabled={roleBusyId === role.id} onClick={() => deleteRole(role)}>
+                      {roleBusyId === role.id ? "Saving..." : "Delete"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>

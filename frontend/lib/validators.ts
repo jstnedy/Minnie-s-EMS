@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const weakPasskeys = new Set(["000000", "111111", "123456"]);
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -10,16 +12,20 @@ const moneySchema = z
   .transform((v) => String(v).trim())
   .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), "Hourly rate must have at most 2 decimals")
   .transform((v) => Number(v))
-  .refine((v) => v >= 0, "Hourly rate must be at least 0");
+  .refine((v) => v > 0, "Hourly rate must be greater than 0")
+  .refine((v) => v <= 100000, "Hourly rate exceeds allowed maximum");
 
 export const employeeCreateSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required"),
   lastName: z.string().trim().min(1, "Last name is required"),
   email: z.string().trim().email().optional().or(z.literal("")),
-  contactNumber: z.string().trim().optional(),
+  contactNumber: z.string().trim().min(1, "Contact number is required"),
   roleId: z.string().min(1, "Role is required"),
   hourlyRate: moneySchema,
-  passkey: z.string().regex(/^\d{6}$/),
+  passkey: z
+    .string()
+    .regex(/^\d{6}$/, "Passkey must be exactly 6 digits")
+    .refine((v) => !weakPasskeys.has(v), "Passkey is too common"),
   status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
 });
 
