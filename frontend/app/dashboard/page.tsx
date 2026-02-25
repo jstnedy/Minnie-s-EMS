@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const [activeEmployees, todayAttendance, pendingCorrections] = await Promise.all([
     prisma.employee.count({ where: { status: "ACTIVE" } }),
     prisma.attendanceLog.count({ where: { timeIn: { gte: todayStart } } }),
-    prisma.attendanceLog.count({ where: { timeOut: null } }),
+    prisma.attendanceCorrectionRequest.count({ where: { status: "PENDING" } }),
   ]);
 
   const cards = [

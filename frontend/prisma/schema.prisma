@@ -24,6 +24,12 @@ enum PayrollStatus {
   FINAL
 }
 
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -37,6 +43,8 @@ model User {
   createdPayrollRuns PayrollRun[]        @relation("PayrollRunCreatedBy")
   createdAdjustments PayrollAdjustment[] @relation("PayrollAdjustmentCreatedBy")
   audits             AuditLog[]
+  requestedCorrections AttendanceCorrectionRequest[] @relation("AttendanceCorrectionRequestedBy")
+  reviewedCorrections  AttendanceCorrectionRequest[] @relation("AttendanceCorrectionReviewedBy")
 }
 
 model Employee {
@@ -91,9 +99,32 @@ model AttendanceLog {
   editReason String?
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  correctionRequests AttendanceCorrectionRequest[]
 
   @@index([employeeId, timeIn])
   @@index([timeIn])
+}
+
+model AttendanceCorrectionRequest {
+  id              String           @id @default(cuid())
+  attendanceLogId String           @map("attendance_log_id")
+  requestedBy     String           @map("requested_by")
+  requestedTimeIn DateTime         @map("requested_time_in")
+  requestedTimeOut DateTime?       @map("requested_time_out")
+  reason          String
+  status          CorrectionStatus @default(PENDING)
+  reviewedBy      String?          @map("reviewed_by")
+  reviewedAt      DateTime?        @map("reviewed_at")
+  reviewNotes     String?          @map("review_notes")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  attendanceLog AttendanceLog @relation(fields: [attendanceLogId], references: [id], onDelete: Cascade)
+  requester    User          @relation("AttendanceCorrectionRequestedBy", fields: [requestedBy], references: [id], onDelete: Cascade)
+  reviewer     User?         @relation("AttendanceCorrectionReviewedBy", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([attendanceLogId])
 }
 
 model PayrollRun {

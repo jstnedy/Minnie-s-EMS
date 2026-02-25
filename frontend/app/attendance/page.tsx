@@ -8,11 +8,13 @@ import { authOptions } from "@/lib/auth";
 export default async function AttendancePage() {
   const session = await getServerSession(authOptions);
   const canDelete = session?.user.role === UserRole.ADMIN;
+  const canEdit = session?.user.role === UserRole.ADMIN || session?.user.role === UserRole.SUPERVISOR;
+  const canReviewCorrections = session?.user.role === UserRole.ADMIN;
 
   return (
     <DashboardShell roles={[UserRole.ADMIN, UserRole.SUPERVISOR]}>
       <h1 className="mb-4 text-2xl font-bold">Attendance</h1>
-      <AttendanceClient canDelete={Boolean(canDelete)} />
+      <AttendanceClient canDelete={Boolean(canDelete)} canEdit={Boolean(canEdit)} canReviewCorrections={Boolean(canReviewCorrections)} />
     </DashboardShell>
   );
 }

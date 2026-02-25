@@ -72,6 +72,11 @@ export const attendanceEditSchema = z.object({
   editReason: z.string().min(3),
 });
 
+export const attendanceCorrectionReviewSchema = z.object({
+  action: z.enum(["approve", "reject"]),
+  reviewNotes: z.string().trim().optional(),
+});
+
 export const payrollComputeSchema = z.object({
   month: z.coerce.number().int().min(1).max(12),
   year: z.coerce.number().int().min(2020).max(2100),
