@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { attendanceEditSchema } from "@/lib/validators";
 import { auditLog } from "@/lib/audit";
@@ -116,6 +116,12 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === "P2021" || error.code === "P2022")) {
+      return NextResponse.json(
+        { error: "Corrections feature is not available yet. Database migration is still pending." },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }
 }
