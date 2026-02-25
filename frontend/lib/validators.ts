@@ -56,7 +56,14 @@ export const attendanceActionSchema = z.object({
   passkey: z.string().regex(/^\d{6}$/),
   qrSlot: z.coerce.number().int().nonnegative(),
   qrSig: z.string().regex(/^[a-f0-9]{64}$/i),
-  photoDataUrl: z.string().startsWith("data:image/"),
+  photoDataUrl: z.string().startsWith("data:image/").optional(),
+});
+
+export const attendancePasskeyVerifySchema = z.object({
+  employeeId: z.string().min(1),
+  passkey: z.string().regex(/^\d{6}$/),
+  qrSlot: z.coerce.number().int().nonnegative(),
+  qrSig: z.string().regex(/^[a-f0-9]{64}$/i),
 });
 
 export const attendanceEditSchema = z.object({

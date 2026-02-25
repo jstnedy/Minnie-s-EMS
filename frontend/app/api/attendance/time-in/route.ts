@@ -1,48 +1,8 @@
-import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyKioskQr } from "@/lib/kiosk-qr";
 import { attendanceActionSchema } from "@/lib/validators";
-
-async function validatePasskey(employeePk: string, passkey: string) {
-  const attempt = await prisma.passkeyAttempt.upsert({
-    where: { employeeId: employeePk },
-    update: {},
-    create: { employeeId: employeePk, attemptsCount: 0 },
-  });
-
-  const now = new Date();
-  if (attempt.lockedUntil && attempt.lockedUntil > now) {
-    return { ok: false, lockedUntil: attempt.lockedUntil };
-  }
-
-  const employee = await prisma.employee.findUnique({ where: { id: employeePk } });
-  if (!employee) return { ok: false as const };
-
-  const valid = await bcrypt.compare(passkey, employee.passkeyHash);
-
-  if (!valid) {
-    const nextAttempts = attempt.attemptsCount + 1;
-    const lock = nextAttempts >= 5 ? new Date(now.getTime() + 5 * 60 * 1000) : null;
-
-    await prisma.passkeyAttempt.update({
-      where: { employeeId: employeePk },
-      data: {
-        attemptsCount: lock ? 0 : nextAttempts,
-        lockedUntil: lock,
-      },
-    });
-
-    return { ok: false, lockedUntil: lock ?? undefined };
-  }
-
-  await prisma.passkeyAttempt.update({
-    where: { employeeId: employeePk },
-    data: { attemptsCount: 0, lockedUntil: null },
-  });
-
-  return { ok: true };
-}
+import { validateEmployeePasskey } from "@/lib/passkey";
 
 export async function POST(req: Request) {
   try {
@@ -56,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Employee unavailable" }, { status: 404 });
     }
 
-    const check = await validatePasskey(employee.id, parsed.passkey);
+    const check = await validateEmployeePasskey(employee.id, parsed.passkey);
     if (!check.ok) {
       return NextResponse.json(
         { error: "Invalid passkey or temporarily locked", lockedUntil: check.lockedUntil ?? null },

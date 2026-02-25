@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const slot = currentQrSlot();
   const signature = signKioskQr(employeeId, slot);
   const baseUrl = process.env.APP_BASE_URL || origin;
-  const kioskUrl = new URL("/kiosk", baseUrl);
+  const kioskUrl = new URL("/attendance/kiosk", baseUrl);
   kioskUrl.searchParams.set("employeeId", employeeId);
   kioskUrl.searchParams.set("slot", String(slot));
   kioskUrl.searchParams.set("sig", signature);

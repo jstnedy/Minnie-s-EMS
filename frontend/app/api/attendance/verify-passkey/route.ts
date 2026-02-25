@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyKioskQr } from "@/lib/kiosk-qr";
-import { attendanceActionSchema } from "@/lib/validators";
 import { validateEmployeePasskey } from "@/lib/passkey";
+import { attendancePasskeyVerifySchema } from "@/lib/validators";
 
 export async function POST(req: Request) {
   try {
-    const parsed = attendanceActionSchema.parse(await req.json());
+    const parsed = attendancePasskeyVerifySchema.parse(await req.json());
     if (!verifyKioskQr(parsed.employeeId, parsed.qrSlot, parsed.qrSig)) {
       return NextResponse.json({ error: "QR code expired or invalid" }, { status: 401 });
     }
@@ -24,26 +24,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const openShift = await prisma.attendanceLog.findFirst({
-      where: { employeeId: employee.id, timeOut: null },
-      orderBy: { timeIn: "desc" },
-    });
-
-    if (!openShift) {
-      return NextResponse.json({ error: "No open shift to time out" }, { status: 409 });
-    }
-
-    const now = new Date();
-    const log = await prisma.attendanceLog.update({
-      where: { id: openShift.id },
-      data: {
-        timeOut: now,
-        deviceInfo: req.headers.get("user-agent") || openShift.deviceInfo,
-        timeOutPhoto: parsed.photoDataUrl,
-      },
-    });
-
-    return NextResponse.json({ ok: true, log });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: "Invalid request", detail: String(error) }, { status: 400 });
   }

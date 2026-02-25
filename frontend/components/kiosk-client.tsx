@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Employee = {
   employeeId: string;
@@ -24,11 +24,8 @@ export function KioskClient({
   const [activeQrSig, setActiveQrSig] = useState(qrSig);
   const [isTimedIn, setIsTimedIn] = useState(false);
   const [openShiftTimeIn, setOpenShiftTimeIn] = useState<string | null>(null);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState("");
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [passkeyVerified, setPasskeyVerified] = useState(false);
+  const [verifyingPasskey, setVerifyingPasskey] = useState(false);
 
   async function loadKioskStatus() {
     if (!employeeId) return;
@@ -69,62 +66,7 @@ export function KioskClient({
     };
   }, [employeeId]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function initCamera() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setStatus("Camera not supported on this device/browser");
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
-        if (!mounted) return;
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        setCameraReady(true);
-      } catch {
-        setStatus("Camera permission is required for attendance");
-      }
-    }
-
-    initCamera();
-
-    return () => {
-      mounted = false;
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
-
-  function capturePhoto() {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !cameraReady) return null;
-
-    const width = video.videoWidth || 640;
-    const height = video.videoHeight || 480;
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext("2d");
-    if (!context) return null;
-    context.drawImage(video, 0, 0, width, height);
-
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-    setPhotoPreview(dataUrl);
-    return dataUrl;
-  }
-
-  async function runAction(action: "time-in" | "time-out") {
+  async function verifyPasskey() {
     const token = await ensureQrToken();
     const slot = token?.slot || activeQrSlot;
     const sig = token?.sig || activeQrSig;
@@ -133,9 +75,47 @@ export function KioskClient({
       return;
     }
 
-    const photoDataUrl = capturePhoto();
-    if (!photoDataUrl) {
-      setStatus("Live photo capture is required");
+    if (!/^\d{6}$/.test(passkey)) {
+      setStatus("Enter a valid 6-digit passkey first.");
+      setPasskeyVerified(false);
+      return;
+    }
+
+    setVerifyingPasskey(true);
+    const res = await fetch("/api/attendance/verify-passkey", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        employeeId,
+        passkey,
+        qrSlot: Number(slot),
+        qrSig: sig,
+      }),
+    });
+    setVerifyingPasskey(false);
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setPasskeyVerified(false);
+      setStatus(data?.error || "Passkey verification failed");
+      return;
+    }
+
+    setPasskeyVerified(true);
+    setStatus("Passkey verified. You can continue.");
+  }
+
+  async function runAction(action: "time-in" | "time-out") {
+    if (!passkeyVerified) {
+      setStatus("Verify passkey first.");
+      return;
+    }
+
+    const token = await ensureQrToken();
+    const slot = token?.slot || activeQrSlot;
+    const sig = token?.sig || activeQrSig;
+    if (!employeeId || !slot || !sig) {
+      setStatus("Invalid or expired QR code. Please rescan.");
       return;
     }
 
@@ -156,19 +136,20 @@ export function KioskClient({
         passkey,
         qrSlot: Number(slot),
         qrSig: sig,
-        photoDataUrl,
       }),
     });
 
     const data = await res.json();
     if (!res.ok) {
       setStatus(data.error || "Failed");
+      if (res.status === 401) setPasskeyVerified(false);
       return;
     }
 
     const fullName = employee ? `${employee.firstName} ${employee.lastName}` : "Employee";
     setStatus(action === "time-in" ? `Welcome, ${fullName}! Time In recorded.` : `Time Out recorded. Goodbye, ${fullName}.`);
     setPasskey("");
+    setPasskeyVerified(false);
     await loadKioskStatus();
     await ensureQrToken();
   }
@@ -183,24 +164,26 @@ export function KioskClient({
           ? `Currently timed in${openShiftTimeIn ? ` since ${new Date(openShiftTimeIn).toLocaleString()}` : ""}`
           : "Currently timed out"}
       </p>
-      <div className="overflow-hidden rounded-xl border border-orange-100 bg-slate-900">
-        <video ref={videoRef} className="h-52 w-full object-cover" playsInline muted />
-      </div>
-      <canvas ref={canvasRef} className="hidden" />
-      {photoPreview ? <img src={photoPreview} alt="Captured proof" className="h-24 w-full rounded-xl object-cover" /> : null}
       <input
         className="field text-center text-lg tracking-[0.3em]"
         maxLength={6}
         pattern="\d{6}"
         placeholder="000000"
+        type="password"
         value={passkey}
-        onChange={(e) => setPasskey(e.target.value)}
+        onChange={(e) => {
+          setPasskey(e.target.value.replace(/\D/g, "").slice(0, 6));
+          setPasskeyVerified(false);
+        }}
       />
+      <button className="btn-secondary" onClick={verifyPasskey} disabled={verifyingPasskey || passkey.length !== 6}>
+        {verifyingPasskey ? "Verifying..." : "Verify Passkey"}
+      </button>
       <div className="grid grid-cols-1 gap-2">
         {!isTimedIn ? (
-          <button className="btn-primary" onClick={() => runAction("time-in")} disabled={!cameraReady}>Time In</button>
+          <button className="btn-primary" onClick={() => runAction("time-in")} disabled={!passkeyVerified}>Time In</button>
         ) : (
-          <button className="btn-secondary" onClick={() => runAction("time-out")} disabled={!cameraReady}>Time Out</button>
+          <button className="btn-secondary" onClick={() => runAction("time-out")} disabled={!passkeyVerified}>Time Out</button>
         )}
       </div>
       <p className="text-center text-sm text-slate-700">{status}</p>
