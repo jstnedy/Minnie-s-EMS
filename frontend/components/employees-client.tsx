@@ -148,7 +148,10 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
     e.preventDefault();
     setSubmitAttempted(true);
 
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      alert("Please complete all required fields correctly.");
+      return;
+    }
 
     setSubmitting(true);
     const payload = {
@@ -431,7 +434,7 @@ export function EmployeesClient({ canDelete }: { canDelete: boolean }) {
             <button className="btn-secondary min-w-24" type="button" onClick={cancelCreateForm} disabled={submitting}>
               Cancel
             </button>
-            <button className="btn-primary min-w-32" disabled={submitting || !canSubmit}>
+            <button className="btn-primary min-w-32" type="submit" disabled={submitting}>
               {submitting ? "Creating..." : "Create"}
             </button>
           </div>
